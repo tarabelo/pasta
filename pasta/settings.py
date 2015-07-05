@@ -7,6 +7,8 @@ from pasta.usersettingclasses import FloatUserSetting, StringUserSetting, IntUse
 class PastaUserSettings(UserSettingsContainer):
     def __init__(self):
         UserSettingsContainer.__init__(self)
+        self.contralign = UserSettingGroup('contralign')
+        self._categories.append('contralign')        
         self.faketree = UserSettingGroup('faketree')
         self._categories.append('faketree')
         self.raxml = UserSettingGroup('raxml')
@@ -56,6 +58,8 @@ class PastaUserSettings(UserSettingsContainer):
         self.fasttree.add_option('model', StringUserSetting(name='model', default='', short_name=None, help='Substitution model used by FastTree. [-gtr for dna and -wag -gamma (WAG) for aa]', subcategory=None))
         self.fasttree.add_option('options', StringUserSetting(name='options', default='', short_name=None, help='Options to be passed to FastTree (equivalent of args).', subcategory=None))
         self.fasttree.add_option('args', StringUserSetting(name='args', default='', short_name=None, help='Arguments to be passed to FastTree.', subcategory=None))
+        self.contralign.add_option('path', StringUserSetting(name='path', default='', short_name=None, help='Path to contralign exeutable', subcategory=None))
+        self.contralign.add_option('args', StringUserSetting(name='args', default='', short_name=None, help='Arguments to be passed to contralign.', subcategory=None))                
         self.opal.add_option('path', StringUserSetting(name='path', default='', short_name=None, help='Path to Opal jar file', subcategory=None))
         self.opal.add_option('args', StringUserSetting(name='args', default='', short_name=None, help='Arguments to be passed to Opal.', subcategory=None))
         self.clustalw2.add_option('path', StringUserSetting(name='path', default='', short_name=None, help='Path to clustalw2 exeutable', subcategory=None))
