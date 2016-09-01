@@ -19,13 +19,16 @@
 # Jiaye Yu and Mark Holder, University of Kansas
 
 
-import os
 import copy
+import os
 from threading import Lock
-from pasta import get_logger
-from pasta.tree import PhylogeneticTree
+
 from dendropy.dataobject.tree import Tree
-from pasta.alignment import  CompactAlignment
+
+from pasta import get_logger
+from pasta.alignment import CompactAlignment
+from pasta.tree import PhylogeneticTree
+
 _LOG = get_logger(__name__)
 
 from pasta.treeholder import TreeHolder
@@ -37,10 +40,10 @@ def bisect_tree(tree, breaking_edge_style='centroid'):
     """Partition 'tree' into two parts
     """
     e = tree.get_breaking_edge(breaking_edge_style)
-    _LOG.debug("breaking_edge length = %s, %s" % (e.length, breaking_edge_style) )
+    _LOG.debug("breaking_edge length = %s, %s" % (e.length, breaking_edge_style))
     snl = tree.n_leaves
     tree1, tree2 = tree.bipartition_by_edge(e)
-    _LOG.debug("Tree 1 has %s nodes, tree 2 has %s nodes" % (tree1.n_leaves, tree2.n_leaves) )
+    _LOG.debug("Tree 1 has %s nodes, tree 2 has %s nodes" % (tree1.n_leaves, tree2.n_leaves))
     assert snl == tree1.n_leaves + tree2.n_leaves
     return tree1, tree2
 
@@ -58,19 +61,20 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
             - Merging the resulting alignments with the merger tool (e.g. Opal).
             
     """
-    BEHAVIOUR_DEFAULTS = {  'break_strategy' : tuple(['centroid']) ,
-                            'max_subproblem_size' : 50,
-                            'delete_temps' : True}
+    BEHAVIOUR_DEFAULTS = {'break_strategy': tuple(['centroid']),
+                          'max_subproblem_size': 50,
+                          'delete_temps': True}
     RECURSION_INDEX = 0
-    def __init__(self, 
-                multilocus_dataset, 
-                pasta_team, 
-                tree,
-                tmp_base_dir,
-                tmp_dir_par=None,
-                reset_recursion_index=False,
-                skip_merge = False,
-                **kwargs):
+
+    def __init__(self,
+                 multilocus_dataset,
+                 pasta_team,
+                 tree,
+                 tmp_base_dir,
+                 tmp_dir_par=None,
+                 reset_recursion_index=False,
+                 skip_merge=False,
+                 **kwargs):
         self._job_lock = Lock()
         self._merge_queued_event = new_merge_event()
         TickableJob.__init__(self)
@@ -121,7 +125,7 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
         is started and queued, and that new merge job is added as a child of self.
         Now, when this new "merge" job finishes, self is completed, and we need
         to tick the parent(s).'''
-        #_LOG.debug("Dependency ready!")
+        # _LOG.debug("Dependency ready!")
         if self.killed:
             raise RuntimeError("PastaAligner Job killed")
         if not self.align_job_list:
@@ -131,7 +135,6 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
                     self._start_merger()
                     return
         self.postprocess()
-        
 
     def _start_merger(self):
         '''Blocks until the two "subjobs" are done 
@@ -145,30 +148,30 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
         '''
         if self.killed:
             raise RuntimeError("PastaAligner Job killed")
-        assert(self.subjob1 is not None)
+        assert (self.subjob1 is not None)
         result1 = self.subjob1.get_results()
         if self.killed:
             raise RuntimeError("PastaAligner Job killed")
         self.subjob1 = None
-        assert(self.subjob2 is not None)
+        assert (self.subjob2 is not None)
         result2 = self.subjob2.get_results()
         self.subjob2 = None
         if self.killed:
             raise RuntimeError("PastaAligner Job killed")
-        assert(result1.get_num_loci() == result2.get_num_loci())
-        
+        assert (result1.get_num_loci() == result2.get_num_loci())
+
         mj_list = []
         for n, r1 in enumerate(result1):
             r2 = result2[n]
             cs = self.context_str + " merger" + str(n)
             mj = self.pasta_team.merger.create_job(r1,
-                                                  r2,
-                                                  tmp_dir_par=self.tmp_dir_par,
-                                                  delete_temps=self.delete_temps,
-                                                  context_str=cs)
+                                                   r2,
+                                                   tmp_dir_par=self.tmp_dir_par,
+                                                   delete_temps=self.delete_temps,
+                                                   context_str=cs)
             mj.add_parent_tickable_job(self)
             self.add_child(mj)
-                        
+
             if self.killed:
                 raise RuntimeError("PastaAligner Job killed")
             mj_list.append(mj)
@@ -182,14 +185,14 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
                 self.pasta_team.temp_fs.remove_dir(d)
 
         self._merge_queued_event.set()
-    
+
     def _get_subjob_dir(self, num):
         '''Creates a numbered directory d1, d2, etc within tmp_dir_par.
         
         Called in bipartition_by_tree, and the directories are cleaned up
         at the end of _start_merger.
         '''
-        assert(self.tmp_base_dir)
+        assert (self.tmp_base_dir)
         rn = "r%d" % PASTAAlignerJob.RECURSION_INDEX
         dn = "d%d" % num
         r_dir = os.path.join(self.tmp_base_dir, rn)
@@ -199,7 +202,6 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
         full_path_to_new_dir = self.pasta_team.temp_fs.create_subdir(sd)
         self._dirs_to_cleanup.append(full_path_to_new_dir)
         return full_path_to_new_dir
-
 
     def launch_alignment(self, tree=None, break_strategy=None, context_str=None):
         '''Puts a alignment job(s) in the queue and then return None
@@ -219,35 +221,36 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
         break_strategy = self.break_strategy
         if tree is not None:
             self.tree = tree
-        self.expected_number_of_taxa = self.multilocus_dataset.get_num_taxa() # for debugging purposes
+        self.expected_number_of_taxa = self.multilocus_dataset.get_num_taxa()  # for debugging purposes
         self._reset_jobs()
         prefix = "self.multilocus_dataset.get_num_taxa = %d" % self.expected_number_of_taxa
         self.context_str = context_str
         if self.context_str is None:
             self.context_str = ''
-        _LOG.debug("Comparing expected_number_of_taxa=%d and max_subproblem_size=%d\n" % (self.expected_number_of_taxa,  self.max_subproblem_size))
+        _LOG.debug("Comparing expected_number_of_taxa=%d and max_subproblem_size=%d\n" % (
+            self.expected_number_of_taxa, self.max_subproblem_size))
         if self.expected_number_of_taxa <= self.max_subproblem_size:
             _LOG.debug("%s...Calling Aligner" % prefix)
             aj_list = []
             for index, single_locus_sd in enumerate(self.multilocus_dataset):
                 aj = self.pasta_team.aligner.create_job(single_locus_sd,
-                                                       tmp_dir_par=self.tmp_dir_par,
-                                                       delete_temps=self.delete_temps,
-                                                       context_str=self.context_str + " align" + str(index))                
+                                                        tmp_dir_par=self.tmp_dir_par,
+                                                        delete_temps=self.delete_temps,
+                                                        context_str=self.context_str + " align" + str(index))
                 aj.add_parent_tickable_job(self)
                 self.add_child(aj)
-                
+
                 aj_list.append(aj)
                 if self.killed:
                     raise RuntimeError("PastaAligner Job killed")
-                
+
                 self.pasta_team.alignmentjobs.append(aj)
-            
+
             self.align_job_list = aj_list
-            
+
             if self.skip_merge:
                 for taxa in self.tree.leaf_node_names():
-                    self.pasta_team.subsets[taxa]=self
+                    self.pasta_team.subsets[taxa] = self
             else:
                 for aj in aj_list:
                     jobq.put(aj)
@@ -275,42 +278,52 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
     # We lock the job objects because kill might be called from another thread
     def get_subjob1(self):
         return self._subjob1
+
     def set_subjob1(self, val):
         self._job_lock.acquire()
         self._subjob1 = val
         self._job_lock.release()
+
     subjob1 = property(get_subjob1, set_subjob1)
 
     def get_subjob2(self):
         return self._subjob2
+
     def set_subjob2(self, val):
         self._job_lock.acquire()
         self._subjob2 = val
         self._job_lock.release()
+
     subjob2 = property(get_subjob2, set_subjob2)
 
     def get_merge_job_list(self):
         return self._merge_job_list
+
     def set_merge_job_list(self, val):
         self._job_lock.acquire()
         self._merge_job_list = val
         self._job_lock.release()
+
     merge_job_list = property(get_merge_job_list, set_merge_job_list)
 
     def get_align_job_list(self):
         return self._align_job_list
+
     def set_align_job_list(self, val):
         self._job_lock.acquire()
         self._align_job_list = val
         self._job_lock.release()
+
     align_job_list = property(get_align_job_list, set_align_job_list)
 
     def get_allow_launch(self):
         return self._allow_launch
+
     def set_allow_launch(self, val):
         self._job_lock.acquire()
         self._allow_launch = val
         self._job_lock.release()
+
     allow_launch = property(get_allow_launch, set_allow_launch)
 
     def kill(self):
@@ -323,7 +336,7 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
         j = self.subjob1
         if j:
             _LOG.debug("Killing subjob1")
-            j.kill()            
+            j.kill()
         j_list = self.merge_job_list
         if j_list:
             for j in j_list:
@@ -336,7 +349,6 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
                 if j:
                     _LOG.debug("Killing align job")
                     j.kill()
-        
 
     def wait(self):
         if self.killed:
@@ -367,8 +379,8 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
         assert tree2.n_leaves > 0
         assert tree1.n_leaves + tree2.n_leaves == self.tree.n_leaves
 
-        _LOG.debug("tree1 = %s ..." % tree1.compose_newick() [0:200])
-        _LOG.debug("tree2 = %s ..." % tree2.compose_newick() [0:200])
+        _LOG.debug("tree1 = %s ..." % tree1.compose_newick()[0:200])
+        _LOG.debug("tree2 = %s ..." % tree2.compose_newick()[0:200])
 
         multilocus_dataset1 = self.multilocus_dataset.sub_alignment(tree1.leaf_node_names())
         multilocus_dataset2 = self.multilocus_dataset.sub_alignment(tree2.leaf_node_names())
@@ -400,7 +412,7 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
             r = self.multilocus_dataset.new_with_shared_meta()
             for j in j_list:
                 r.append(j.get_results())
-            #self.align_job_list = None
+            # self.align_job_list = None
             self.finished = True
         else:
             j_list = self.merge_job_list
@@ -408,31 +420,31 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
                 r = self.multilocus_dataset.new_with_shared_meta()
                 for j in j_list:
                     r.append(j.get_results())
-                #self.merge_job_list = None
+                # self.merge_job_list = None
                 self.finished = True
             else:
-                return None # this can happen if jobs are killed
+                return None  # this can happen if jobs are killed
         return r
 
+
 class PASTAMergerJob(PASTAAlignerJob):
-    
-    def __init__(self, 
-                multilocus_dataset,
-                pasta_team, 
-                tree,
-                tmp_base_dir,
-                tmp_dir_par=None,
-                reset_recursion_index=False,
-                delete_temps2 = None,
-                **kwargs):
-        PASTAAlignerJob.__init__(self, 
+    def __init__(self,
+                 multilocus_dataset,
+                 pasta_team,
+                 tree,
+                 tmp_base_dir,
+                 tmp_dir_par=None,
+                 reset_recursion_index=False,
+                 delete_temps2=None,
+                 **kwargs):
+        PASTAAlignerJob.__init__(self,
                                  multilocus_dataset,
-                                 pasta_team, 
-                                 tree, 
-                                 tmp_base_dir, 
-                                 tmp_dir_par, 
+                                 pasta_team,
+                                 tree,
+                                 tmp_base_dir,
+                                 tmp_dir_par,
                                  reset_recursion_index,
-                                 **kwargs                                 
+                                 **kwargs
                                  )
         if delete_temps2 is not None:
             self.delete_temps = delete_temps2
@@ -441,8 +453,8 @@ class PASTAMergerJob(PASTAAlignerJob):
         self.results_lock = Lock()
 
     def launch_alignment(self, context_str=None):
-        '''
-        '''
+        """
+        """
         if self.killed:
             raise RuntimeError("PastaAligner Job killed")
 
@@ -452,34 +464,34 @@ class PASTAMergerJob(PASTAAlignerJob):
             self.context_str = ''
         node_count = self.tree.count_nodes()
         _LOG.debug("Recursive merge on a branch with %d subsets" % (node_count))
-        prefix = "subsets tree: %s" %self.tree.compose_newick()[0:200]
+        prefix = "subsets tree: %s" % self.tree.compose_newick()[0:200]
         if node_count == 2:
             nodes = self.tree._tree.nodes()
             _LOG.debug("%s ... pairwise merge " % prefix)
             self.skip_merge = False
-            self.subjob1 = self.pasta_team.subsets[nodes[0].label]           
+            self.subjob1 = self.pasta_team.subsets[nodes[0].label]
             self.subjob2 = self.pasta_team.subsets[nodes[1].label]
-            
+
             self.subjob1.add_parent(self)
             self.add_child(self.subjob1)
 
             self.subjob2.add_parent(self)
-            self.add_child(self.subjob2)                                        
+            self.add_child(self.subjob2)
         else:
             _LOG.debug("%s ... recursing further " % prefix)
             self.skip_merge = True
-            
+
             # Reroot near centroid edge
             ce = self.tree.get_centroid_edge(spanning=True)
             nr = ce.head_node if not ce.head_node.is_leaf() else ce.tail_node
-            self.tree._tree.reroot_at_node(nr,delete_outdegree_one=False)            
-            _LOG.debug("rerooted to: %s ..." % self.tree.compose_newick()[0:200])   
+            self.tree._tree.reroot_at_node(nr, delete_outdegree_one=False)
+            _LOG.debug("rerooted to: %s ..." % self.tree.compose_newick()[0:200])
             # For each path from root to its children, create a new merge job         
             merge_job_list = []
             nr = self.tree._tree.seed_node
             children = nr.child_nodes()
-            for keepchild in children:                
-                remchilds = []                
+            for keepchild in children:
+                remchilds = []
                 for remchild in children:
                     if remchild != keepchild:
                         remchilds.append(nr.reversible_remove_child(remchild, suppress_deg_two=False))
@@ -489,26 +501,26 @@ class PASTAMergerJob(PASTAAlignerJob):
                     nr.reinsert_nodes(child)
                 _LOG.debug("child = %s ..." % t1.compose_newick()[0:200])
                 multilocus_dataset1 = self.multilocus_dataset.new_with_shared_meta()
-                
-                if t1.count_nodes() == 2:            
+
+                if t1.count_nodes() == 2:
                     ns = t1._tree.nodes()
                     tmp_dir_par = self.get_pairwise_temp_dir(ns[0].label, ns[1].label)
                 else:
-                    tmp_dir_par = self.tmp_base_dir                    
+                    tmp_dir_par = self.tmp_base_dir
                 configuration = self.configuration()
                 cj = PASTAMergerJob(multilocus_dataset=multilocus_dataset1,
                                     pasta_team=self.pasta_team,
                                     tree=t1,
                                     tmp_base_dir=self.tmp_base_dir,
-                                    tmp_dir_par= tmp_dir_par,
+                                    tmp_dir_par=tmp_dir_par,
                                     delete_temps2=False,
                                     **configuration)
                 cj.add_parent(self)
-                self.add_child(cj)                                
-                merge_job_list.append(cj);
-                        
+                self.add_child(cj)
+                merge_job_list.append(cj)
+
             self.merge_job_list = merge_job_list
-            
+
             # now launch these new merge jobs
             for merge_job in self.merge_job_list:
                 if self.killed:
@@ -516,16 +528,16 @@ class PASTAMergerJob(PASTAAlignerJob):
                 merge_job.launch_alignment()
 
             self._merge_queued_event.set()
-            
+
             if self.killed:
                 raise RuntimeError("PastaAligner Job killed")
         return
 
     def get_results(self):
-        
+
         self.wait()
-        
-        self.results_lock.acquire()        
+
+        self.results_lock.acquire()
         if self.result_alignment is not None:
             self.results_lock.release()
             return self.result_alignment
@@ -539,12 +551,12 @@ class PASTAMergerJob(PASTAAlignerJob):
                 # These are merge jobs that need transitivity merging             
                 if self.skip_merge:
                     r = self.multilocus_dataset.new_with_shared_meta()
-                    r.append(j_list[0].get_results()[0]) #TODO: this should be changed to be multi-locus
+                    r.append(j_list[0].get_results()[0])  # TODO: this should be changed to be multi-locus
                     for j in j_list[1:]:
-                        r[0].merge_in(j.get_results()[0]) #TODO: this should be changed to be multi-locus
-                        j.clear_results_object()                        
-                    #assert all(x.is_aligned() for x in r)
-                else: # These are pairwise merges
+                        r[0].merge_in(j.get_results()[0])  # TODO: this should be changed to be multi-locus
+                        j.clear_results_object()
+                        # assert all(x.is_aligned() for x in r)
+                else:  # These are pairwise merges
                     r = self.multilocus_dataset.new_with_shared_meta()
                     for j in j_list:
                         a = CompactAlignment()
@@ -553,23 +565,23 @@ class PASTAMergerJob(PASTAAlignerJob):
                 self.result_alignment = r
                 self.finished = True
             else:
-                r = None # this can happen if jobs are killed
+                r = None  # this can happen if jobs are killed
         self.results_lock.release()
         return r
-        
+
     def clear_results_object(self):
         self.results_lock.acquire()
-        for alg in self.result_alignment: 
+        for alg in self.result_alignment:
             alg.clear()
         self.result_alignment = None
-        self.results_lock.release()                                        
-        
+        self.results_lock.release()
+
     def get_pairwise_temp_dir(self, label1, label2):
         ''' Get a temp file for a pairwise merge
         '''
-        assert(self.tmp_base_dir)
-        label = "%s_%s" %(label1,label2)
-        sd = os.path.join(self.tmp_base_dir, label.replace("/","").replace("\\", ""))
+        assert (self.tmp_base_dir)
+        label = "%s_%s" % (label1, label2)
+        sd = os.path.join(self.tmp_base_dir, label.replace("/", "").replace("\\", ""))
         full_path_to_new_dir = self.pasta_team.temp_fs.create_subdir(sd)
         self._dirs_to_cleanup.append(full_path_to_new_dir)
         return full_path_to_new_dir

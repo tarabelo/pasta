@@ -27,11 +27,11 @@ import os
 import platform
 import sys
 
+import pasta
+from pasta import filemgr
 from pasta import get_logger, PASTA_SYSTEM_PATHS_CFGFILE
 from pasta.settings import PastaUserSettings
 from pasta.tools import get_external_tool_classes
-import pasta
-from pasta import filemgr
 
 _LOG = get_logger(__name__)
 
@@ -127,3 +127,39 @@ def get_input_source_directory(config):
         return os.path.dirname(os.path.abspath(options.input))
 
 
+sc = None
+
+
+def init_spark():
+    """
+    Init the SPARK context if we are running in a spark cluster
+    :return: The SparkContext, if we are using Spark; false otherwise
+    """
+    try:
+        # noinspection PyUnresolvedReferences,PyUnresolvedReferences
+        from pyspark import SparkConf, SparkContext
+    except ImportError:
+        return False
+    global sc
+    if not sc:
+        conf = SparkConf()
+        conf.set("spark.app.name", "Mi apli")
+        sc = SparkContext(conf=conf)
+    return sc
+
+
+def finish_spark():
+    """
+    Set the SparkContext to None so avoid to use again
+    """
+    global sc
+    sc = None
+
+
+def get_sparkcontext():
+    """
+    Get the actual SparkContext
+    :return: the SparkContext
+    """
+    global sc
+    return sc

@@ -20,21 +20,20 @@
 
 # Jiaye Yu and Mark Holder, University of Kansas
 
+import copy
 import os
-import sys
-import time
 import platform
 import shutil
+import sys
+import time
 
+from alignment import Alignment
+from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG
 from pasta import get_logger, GLOBAL_DEBUG, PASTA_SYSTEM_PATHS_CFGFILE, DEFAULT_MAX_MB,\
     TEMP_SEQ_UNMASKED_ALIGNMENT_TAG
-from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG
 from pasta.filemgr import open_with_intermediates
 from pasta.scheduler import jobq, start_worker, DispatchableJob, FakeJob,\
     TickingDispatchableJob
-
-from alignment import Alignment
-import copy
 
 _LOG = get_logger(__name__)
 
@@ -176,6 +175,7 @@ class Aligner(ExternalTool):
         seqfn = os.path.join(scratch_dir, "input.fasta")
         alignment.write_filepath(seqfn, file_format='FASTA')
         alignedfn = os.path.join(scratch_dir, 'input.aligned')
+
         return scratch_dir, seqfn, alignedfn
 
     def create_job(self, *args, **kwargs):
@@ -781,7 +781,7 @@ class FastTree(TreeEstimator):
     def create_job(self, alignment, starting_tree=None, **kwargs):
         scratch_dir, seqfn, datatype, options = self._prepare_input(alignment, **kwargs)
         num_cpus = kwargs.get('num_cpus')
-        log_file = os.path.join(scratch_dir, 'log');
+        log_file = os.path.join(scratch_dir, 'log')
 
         invoc = [self.exe, '-quiet']
         if datatype != '':

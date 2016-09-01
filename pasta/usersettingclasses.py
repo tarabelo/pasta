@@ -18,15 +18,18 @@
 # Jiaye Yu and Mark Holder, University of Kansas
 
 import ConfigParser
-import os
 import glob
+import os
+
 from pasta import get_logger
 from pasta.filemgr import open_with_intermediates
 
 _LOG = get_logger(__name__)
 
+
 def _underscores_to_dashes(s):
     return '-'.join(s.split('_'))
+
 
 class UserSetting(object):
     def __init__(self, name, default, **kwargs):
@@ -39,23 +42,28 @@ class UserSetting(object):
             self.subcategory = ''
         self.help = kwargs.get('help')
         self._value = self.default
+
     def is_valid(self):
         return self.value is not None
 
     def get_value(self):
         return self._value
+
     def set_value(self, v):
         self._value = v
+
     value = property(get_value, set_value)
+
     def as_config_parsable(self):
         v = self.value
         if v is None:
             return None
         return str(v)
+
     def _get_optparse_option_args_dict(self):
-        kwargs = {'dest' : self.name,
-                    'default' : None
-                    }
+        kwargs = {'dest': self.name,
+                  'default': None
+                  }
         if self.help is not None:
             kwargs['help'] = self.help
         return kwargs
@@ -72,14 +80,17 @@ class UserSetting(object):
 class StringUserSetting(UserSetting):
     pass
 
+
 class ChoiceUserSetting(UserSetting):
     def __init__(self, name, default, choices, multiple_choices=False, **kwargs):
         UserSetting.__init__(self, name, default, **kwargs)
         self.multiple_choices = multiple_choices
         self.choices = [i.lower() for i in choices]
         self.value = default
+
     def get_value(self):
         return self._value
+
     def set_value(self, v):
         if v is None:
             self._value = None
@@ -97,14 +108,17 @@ class ChoiceUserSetting(UserSetting):
                 x = [i.lower() for i in o.split()]
             for el in x:
                 if el not in self.choices:
-                    raise ValueError("%s is not a valid setting for %s. Exepcting one of %s" % (el, self.name, str(self.choices)))
+                    raise ValueError(
+                        "%s is not a valid setting for %s. Exepcting one of %s" % (el, self.name, str(self.choices)))
             self._value = x
         else:
             el = v.lower()
             if el not in self.choices:
                 raise ValueError("%s is not a valid setting for %s" % (el, self.name))
             self._value = el
+
     value = property(get_value, set_value)
+
     def as_config_parsable(self):
         v = self.value
         if v is None:
@@ -113,13 +127,16 @@ class ChoiceUserSetting(UserSetting):
             return ' '.join(v)
         return str(v)
 
+
 class NumberUserSetting(UserSetting):
     def __init__(self, name, default, min=None, max=None, **kwargs):
         UserSetting.__init__(self, name, default, **kwargs)
         self.max = max
         self.min = min
+
     def get_value(self):
         return self._value
+
     def set_value(self, v):
         v = self.conv_type(v)
         if (self.max is not None) and v > self.max:
@@ -127,15 +144,19 @@ class NumberUserSetting(UserSetting):
         if (self.min is not None) and v < self.min:
             raise ValueError("%s must be >= %s" % (self.name, str(self.min)))
         self._value = v
+
     value = property(get_value, set_value)
+
 
 class BoolUserSetting(UserSetting):
     def __init__(self, name, default, min=None, max=None, **kwargs):
         UserSetting.__init__(self, name, default, **kwargs)
         self.value = default
         self.default = self.value
+
     def get_value(self):
         return self._value
+
     def set_value(self, v):
         if isinstance(v, str):
             l = v.lower()
@@ -146,6 +167,7 @@ class BoolUserSetting(UserSetting):
             self._value = v
         else:
             raise TypeError("Expecting a boolean for %s" % self.name)
+
     value = property(get_value, set_value)
 
     def add_to_optparser(self, parser):
@@ -161,27 +183,32 @@ class BoolUserSetting(UserSetting):
         else:
             parser.add_option(long_name, **kwargs)
 
+
 class FloatUserSetting(NumberUserSetting):
     def __init__(self, name, default, min=None, max=None, **kwargs):
         self.conv_type = float
         NumberUserSetting.__init__(self, name, default, min=min, max=max, **kwargs)
         self.value = default
+
     def _get_optparse_option_args_dict(self):
         kwargs = UserSetting._get_optparse_option_args_dict(self)
         kwargs['type'] = 'float'
         kwargs['metavar'] = '#.#'
         return kwargs
 
+
 class IntUserSetting(NumberUserSetting):
     def __init__(self, name, default, min=None, max=None, **kwargs):
         self.conv_type = int
         NumberUserSetting.__init__(self, name, default, min=min, max=max, **kwargs)
         self.value = default
+
     def _get_optparse_option_args_dict(self):
         kwargs = UserSetting._get_optparse_option_args_dict(self)
         kwargs['type'] = 'int'
         kwargs['metavar'] = '#'
         return kwargs
+
 
 class UserSettingGroup(object):
     def __init__(self, name):
@@ -208,6 +235,7 @@ class UserSettingGroup(object):
             return self.__dict__['options'][att_name].value
         except:
             raise AttributeError("Attribute %s not found" % att_name)
+
     def __setattr__(self, att_name, value):
         if att_name in ['name', 'options']:
             self.__dict__[att_name] = value
@@ -216,6 +244,7 @@ class UserSettingGroup(object):
             if o is None:
                 raise AttributeError("Attribute %s not found" % att_name)
             o.value = value
+
     def set_config_parser_fields(self, p):
         if not p.has_section(self.name):
             p.add_section(self.name)
@@ -238,7 +267,7 @@ class UserSettingGroup(object):
                 _LOG.warn('Unknown option "%s" in section "%s" skipped!' % (k, self.name))
 
     def all_options(self):
-        key_opt_list =[i for i in self.options.iteritems()]
+        key_opt_list = [i for i in self.options.iteritems()]
         key_opt_list.sort()
         return [i[1] for i in key_opt_list]
 
@@ -255,7 +284,7 @@ class UserSettingGroup(object):
         s_list = self.subcategories()
         for s in s_list:
             n = self.name
-            if n == 'sate': # how is this  for a hack
+            if n == 'sate':  # how is this  for a hack
                 n = 'SATe'
             if s:
                 g = OptionGroup(parser, '%s %s options' % (n, s))
@@ -275,6 +304,7 @@ class UserSettingGroup(object):
             if v is not None:
                 o.value = v
 
+
 def get_list_of_seq_filepaths_from_dir(dir_path):
     """
     Given a directory, finds all '*.fas' and '*.fasta' files and returns them 
@@ -285,7 +315,8 @@ def get_list_of_seq_filepaths_from_dir(dir_path):
     if not os.path.exists(dir_path):
         raise Exception("The input sequence file directory '%s' does not exist.\n" % dir_path)
     if not os.path.isdir(dir_path):
-        raise Exception("The input sequence files must be put into one directory for multilocus analysis, '%s' is not a directory.\n" % dir_path)
+        raise Exception(
+            "The input sequence files must be put into one directory for multilocus analysis, '%s' is not a directory.\n" % dir_path)
     dot_fas_glob = os.path.join(os.path.abspath(dir_path), '*.fas')
     dot_fasta_glob = os.path.join(os.path.abspath(dir_path), '*.fasta')
     seq_filename_list = glob.glob(dot_fas_glob) + glob.glob(dot_fasta_glob)
@@ -294,8 +325,8 @@ def get_list_of_seq_filepaths_from_dir(dir_path):
     seq_filename_list.sort()
     return seq_filename_list
 
-class UserSettingsContainer(object):
 
+class UserSettingsContainer(object):
     def __init__(self):
         self._categories = []
         self._config_parser = ConfigParser.RawConfigParser()
@@ -328,7 +359,7 @@ class UserSettingsContainer(object):
         string.
         """
         if multilocus:
-            #self.read_seq_filepaths_from_delimited_string(src)
+            # self.read_seq_filepaths_from_delimited_string(src)
             self.read_seq_filepaths_from_dir(src)
         else:
             self.input_seq_filepaths = [src]
@@ -342,7 +373,7 @@ class UserSettingsContainer(object):
 
     def save_to_filepath(self, filepath):
         if filepath is None:
-            filepath = os.path.expanduser(os.path.join( '~', '.pasta', 'pasta.cfg'))
+            filepath = os.path.expanduser(os.path.join('~', '.pasta', 'pasta.cfg'))
         f = open_with_intermediates(filepath, 'wb')
         for g in self.get_categories():
             g.set_config_parser_fields(self._config_parser)
@@ -365,7 +396,8 @@ class UserSettingsContainer(object):
         except:
             pass
         if not p:
-            raise RuntimeError("Cannot create a wrapper around the aligner %s because a path setting was not found in the configuration for this tool" % name)
+            raise RuntimeError(
+                "Cannot create a wrapper around the aligner %s because a path setting was not found in the configuration for this tool" % name)
 
         from pasta.tools import get_aligner_classes, CustomAligner
         d = g.dict()
@@ -392,7 +424,8 @@ class UserSettingsContainer(object):
         except:
             pass
         if not p:
-            raise RuntimeError("Cannot create a wrapper around the merger %s because a path setting was not found in the configuration for this tool" % p)
+            raise RuntimeError(
+                "Cannot create a wrapper around the merger %s because a path setting was not found in the configuration for this tool" % p)
 
         from pasta.tools import MergerClasses
         d = g.dict()
@@ -419,7 +452,8 @@ class UserSettingsContainer(object):
         except:
             pass
         if not p:
-            raise RuntimeError("Cannot create a wrapper around the tree_estimator %s because a path setting was not found in the configuration for this tool" % name)
+            raise RuntimeError(
+                "Cannot create a wrapper around the tree_estimator %s because a path setting was not found in the configuration for this tool" % name)
 
         from pasta.tools import TreeEstimatorClasses
         d = g.dict()
@@ -447,8 +481,9 @@ class UserSettingsContainer(object):
         """
         for c in self.get_categories():
             c.set_values_from_dict(d)
+
     def dicts(self):
         d = {}
-        for  c in self.get_categories():
+        for c in self.get_categories():
             d[c.name] = c.dict()
         return d

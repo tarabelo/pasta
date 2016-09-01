@@ -18,36 +18,37 @@
 # Jiaye Yu and Mark Holder, University of Kansas
 
 
+import copy
 import math
 import os
-import random
-import time
 import sys
-import copy
-from threading import Lock
-from pasta import get_logger, TEMP_SEQ_UNMASKED_ALIGNMENT_TAG
-from dendropy.dataobject.taxon import Taxon
-from pasta.tree import PhylogeneticTree
+import time
 from StringIO import StringIO
+from threading import Lock
+
+from dendropy.dataobject.taxon import Taxon
+
+from pasta import get_logger
+from pasta.tree import PhylogeneticTree
+
 _LOG = get_logger(__name__)
 
-from pasta.treeholder import TreeHolder, resolve_polytomies,\
+from pasta.treeholder import TreeHolder, resolve_polytomies, \
     read_newick_with_translate
 from pasta.pastaalignerjob import PASTAAlignerJob, PASTAMergerJob
-from pasta import get_logger
 from pasta.utility import record_timestamp
 from pasta.scheduler import jobq
-from pasta.filemgr import  TempFS
+from pasta.filemgr import TempFS
 from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG, MESSENGER
 
 
-
-class PastaTeam (object):
+class PastaTeam(object):
     '''A blob for holding the appropriate merger, alignment, and tree_estimator tools
     as well as the TempFS object that keeps track of the directories that have
     been created by this process.
 
     '''
+
     def __init__(self, config):
         """Uses a configuration object `cfg` to get reference for the tools the user
         has chosen.
@@ -57,50 +58,54 @@ class PastaTeam (object):
             self._temp_fs = TempFS()
             self.aligner = config.create_aligner(temp_fs=self._temp_fs)
             self.aligner.max_mem_mb = max_mem_mb
-            self.hmmeralign = config.create_aligner(temp_fs=self._temp_fs, name = "hmmeralign")
+            self.hmmeralign = config.create_aligner(temp_fs=self._temp_fs, name="hmmeralign")
             self.merger = config.create_merger(temp_fs=self._temp_fs)
             self.merger.max_mem_mb = max_mem_mb
             self.tree_estimator = config.create_tree_estimator(temp_fs=self._temp_fs)
             self.raxml_tree_estimator = config.create_tree_estimator(name='Raxml', temp_fs=self._temp_fs)
-            self.subsets = {} # needed for pastamerger
-            self.alignmentjobs = [] # needed for pastamerger
+            self.subsets = {}  # needed for pastamerger
+            self.alignmentjobs = []  # needed for pastamerger
         except AttributeError:
-            raise
             raise ValueError("config cannot be None unless all of the tools are passed in.")
+
     def get_temp_fs(self):
         return self._temp_fs
+
     temp_fs = property(get_temp_fs)
+
 
 class AcceptMode:
     BLIND_MODE, NONBLIND_MODE = range(2)
 
-class PastaJob (TreeHolder):
+
+class PastaJob(TreeHolder):
     """The top-level PASTA algorithm class.  The run_pasta method iteratively
     decomposes the tree and does tree searching until the termination criterion
     is reached.
     """
-    BEHAVIOUR_DEFAULTS = {  'time_limit' : 24*60*60.0,
-                            'iter_limit' : -1,
-                            'time_without_imp_limit' : -1,
-                            'iter_without_imp_limit' : -1,
-                            'blind_after_total_time' : -1,
-                            'blind_after_total_iter' : -1,
-                            'blind_after_time_without_imp' : -1,
-                            'blind_after_iter_without_imp' : -1,
-                            'after_blind_time_term_limit' : 24*60*60.0,
-                            'after_blind_iter_term_limit' : -1,
-                            'after_blind_time_without_imp_limit': -1,
-                            'after_blind_iter_without_imp_limit': 1,
-                            'move_to_blind_on_worse_score' : False,
-                            'blind_mode_is_final' : True,
-                            'max_subproblem_size' : 200,
-                            'max_subproblem_frac' : 0.2,
-                            'start_tree_search_from_current' : False,
-                            'keep_realignment_temporaries' : False,
-                            'keep_iteration_temporaries' : False,
-                            'return_final_tree_and_alignment' : False,
-                            'mask_gappy_sites' : 1
-                        }
+    BEHAVIOUR_DEFAULTS = {'time_limit': 24 * 60 * 60.0,
+                          'iter_limit': -1,
+                          'time_without_imp_limit': -1,
+                          'iter_without_imp_limit': -1,
+                          'blind_after_total_time': -1,
+                          'blind_after_total_iter': -1,
+                          'blind_after_time_without_imp': -1,
+                          'blind_after_iter_without_imp': -1,
+                          'after_blind_time_term_limit': 24 * 60 * 60.0,
+                          'after_blind_iter_term_limit': -1,
+                          'after_blind_time_without_imp_limit': -1,
+                          'after_blind_iter_without_imp_limit': 1,
+                          'move_to_blind_on_worse_score': False,
+                          'blind_mode_is_final': True,
+                          'max_subproblem_size': 200,
+                          'max_subproblem_frac': 0.2,
+                          'start_tree_search_from_current': False,
+                          'keep_realignment_temporaries': False,
+                          'keep_iteration_temporaries': False,
+                          'return_final_tree_and_alignment': False,
+                          'mask_gappy_sites': 1
+                          }
+
     def configuration(self):
         d = {}
         for k in PASTAAlignerJob.BEHAVIOUR_DEFAULTS.keys():
@@ -115,7 +120,7 @@ class PastaJob (TreeHolder):
             function.
         """
         TreeHolder.__init__(self,
-                            multilocus_dataset.dataset, 
+                            multilocus_dataset.dataset,
                             force_fully_resolved=True)
         if tree is not None:
             resolve_polytomies(tree, update_splits=True)
@@ -171,7 +176,6 @@ class PastaJob (TreeHolder):
         self.best_tree_tmp_filename = None
         self.best_alignment_tmp_filename = None
 
-
     def _reset_jobs(self):
         self.tree_build_job = None
         self.pasta_decomp_job = None
@@ -184,6 +188,7 @@ class PastaJob (TreeHolder):
         self._job_lock.acquire()
         self._pasta_alignment_job = val
         self._job_lock.release()
+
     pasta_aligner_job = property(get_pasta_alignment_job, set_pasta_alignment_job)
 
     def get_tree_build_job(self):
@@ -193,6 +198,7 @@ class PastaJob (TreeHolder):
         self._job_lock.acquire()
         self._tree_build_job = val
         self._job_lock.release()
+
     tree_build_job = property(get_tree_build_job, set_tree_build_job)
 
     def _curr_running_times(self):
@@ -279,7 +285,7 @@ class PastaJob (TreeHolder):
             return AcceptMode.NONBLIND_MODE
         if self.is_stuck_in_blind:
             return AcceptMode.BLIND_MODE
-        #if self.move_to_blind_on_worse_score and ( (new_score <= self.score) or self.score is None ):
+        # if self.move_to_blind_on_worse_score and ( (new_score <= self.score) or self.score is None ):
         if self.move_to_blind_on_worse_score and (new_score <= self.score):
             self._blindmode_trigger = 'move_to_blind_on_worse_score'
             return AcceptMode.BLIND_MODE
@@ -314,25 +320,25 @@ class PastaJob (TreeHolder):
         self.best_alignment_tmp_filename = self.curr_iter_align_tmp_filename
 
     def build_subsets_tree(self, curr_tmp_dir_par):
-        translate={}
+        translate = {}
         t2 = {}
         for node in self.tree._tree.leaf_iter():
-            nalsj = self.pasta_team.subsets[node.taxon.label]            
-            newname = nalsj.tmp_dir_par[len(curr_tmp_dir_par)+1:]
+            nalsj = self.pasta_team.subsets[node.taxon.label]
+            newname = nalsj.tmp_dir_par[len(curr_tmp_dir_par) + 1:]
             translate[node.taxon.label] = newname
-            t2[newname] = set([nalsj])            
-        subsets_tree = PhylogeneticTree(read_newick_with_translate(StringIO(self.tree_str),translate_dict=translate))
-        for node in subsets_tree._tree.leaf_iter():            
+            t2[newname] = set([nalsj])
+        subsets_tree = PhylogeneticTree(read_newick_with_translate(StringIO(self.tree_str), translate_dict=translate))
+        for node in subsets_tree._tree.leaf_iter():
             node.alignment_subset_job = t2[node.taxon]
         del t2
         del translate
-        _LOG.debug("nodes labeled")        
-        #subsets_tree._tree.infer_taxa()
-        #_LOG.debug("fake taxa inferred")                   
-        #Then make sure the tree is rooted at a branch (not at a node). 
+        _LOG.debug("nodes labeled")
+        # subsets_tree._tree.infer_taxa()
+        # _LOG.debug("fake taxa inferred")
+        # Then make sure the tree is rooted at a branch (not at a node).
         if len(subsets_tree._tree.seed_node.child_nodes()) > 2:
-            subsets_tree._tree.reroot_at_edge(subsets_tree._tree.seed_node.child_nodes()[0].edge)                        
-        _LOG.debug("Subset Labeling (start):\n%s" %str(subsets_tree.compose_newick()))
+            subsets_tree._tree.reroot_at_edge(subsets_tree._tree.seed_node.child_nodes()[0].edge)
+        _LOG.debug("Subset Labeling (start):\n%s" % str(subsets_tree.compose_newick()))
         # Then label internal branches based on their children, and collapse redundant edges. 
         for node in subsets_tree._tree.postorder_internal_node_iter():
             # my label is the intersection of my children, 
@@ -344,32 +350,32 @@ class PastaJob (TreeHolder):
             # Now go ahead and prune any child whose label encompasses my label. 
             # Use indexing instead of iteration, because with each collapse, 
             # new children can be added, and we want to process them as well.                         
-            i = 0;
-            while i < len(node.child_nodes()):                                
+            i = 0
+            while i < len(node.child_nodes()):
                 c = node.child_nodes()[i]
                 if node.alignment_subset_job.issubset(c.alignment_subset_job):
                     # Dendropy does not collapsing and edge that leads to a tip. Remove instead
                     if c.child_nodes():
-                        c.edge.collapse()                                    
+                        c.edge.collapse()
                     else:
-                        node.remove_child(c)                      
+                        node.remove_child(c)
                 else:
                     i += 1
-            
+
         # Now, the remaining edges have multiple labels. These need to
         # be further resolved. Do it by minimum length
         #   First find all candidate edges that we might want to contract
         candidate_edges = set()
         for e in subsets_tree._tree.postorder_edge_iter():
             if e.tail_node and e.head_node.alignment_subset_job.intersection(e.tail_node.alignment_subset_job):
-                candidate_edges.add( (e.length,e) )
-        #   Then sort the edges, and start removing them one by one
+                candidate_edges.add((e.length, e))
+        # Then sort the edges, and start removing them one by one
         #   only if an edge is still having intersecting labels at the two ends                                                    
-        candidate_edges = sorted(candidate_edges)        
+        candidate_edges = sorted(candidate_edges)
         for (el, edge) in candidate_edges:
             I = edge.tail_node.alignment_subset_job.intersection(edge.head_node.alignment_subset_job)
             if I:
-                edge.tail_node.alignment_subset_job = I 
+                edge.tail_node.alignment_subset_job = I
                 if edge.head_node.child_nodes():
                     edge.collapse()
                 else:
@@ -377,21 +383,21 @@ class PastaJob (TreeHolder):
         # Make sure the tree is correct, remove the actual jobs
         # from nodes (can cause deep-copy problems), assign a label to each
         # node, and keep a mapping between the labels and actual alignment job objects
-        self.pasta_team.subsets = {} # Let this now map from subset labels to the actual alignment jobs
+        self.pasta_team.subsets = {}  # Let this now map from subset labels to the actual alignment jobs
         for node in subsets_tree._tree.postorder_node_iter():
             assert len(node.alignment_subset_job) == 1
             nalsj = node.alignment_subset_job.pop()
-            node.alignment_subset_job = None 
-            node.label = nalsj.tmp_dir_par[len(curr_tmp_dir_par)+1:]
+            node.alignment_subset_job = None
+            node.label = nalsj.tmp_dir_par[len(curr_tmp_dir_par) + 1:]
             self.pasta_team.subsets[node.label] = nalsj
             if node.is_leaf():
                 # Add a dummy taxon, or else dendropy can get confused
                 node.taxon = Taxon(label=node.label)
-        #subsets_tree._tree.infer_taxa()
+        # subsets_tree._tree.infer_taxa()
         return subsets_tree
-        
+
     def run(self, tmp_dir_par, pasta_products=None):
-        assert(os.path.exists(tmp_dir_par))
+        assert (os.path.exists(tmp_dir_par))
 
         self._reset_current_run_settings()
         self._reset_jobs()
@@ -403,11 +409,11 @@ class PastaJob (TreeHolder):
 
         configuration = self.configuration()
         # Here we check if the max_subproblem_frac is more stringent than max_subproblem_size
-        frac_max = int(math.ceil(self.max_subproblem_frac*self.tree.n_leaves))
+        frac_max = int(math.ceil(self.max_subproblem_frac * self.tree.n_leaves))
         if frac_max > self.max_subproblem_size:
             configuration['max_subproblem_size'] = frac_max
         MESSENGER.send_info('Max subproblem set to {0}'.format(
-                configuration['max_subproblem_size']))
+            configuration['max_subproblem_size']))
         if configuration['max_subproblem_size'] >= self.tree.n_leaves:
             MESSENGER.send_warning('''\n
 WARNING: you have specified a max subproblem ({0}) that is equal to or greater
@@ -418,10 +424,11 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
     try running PASTA again. If you intended to use PASTA to align your data with
     the specified aligner tool *without* any decomposition, you can ignore this
     message.\n'''.format(configuration['max_subproblem_size'],
-                       self.tree.n_leaves))
+                         self.tree.n_leaves))
         if configuration['max_subproblem_size'] == 1:
-             MESSENGER.send_error(''' You have specified a max subproblem size of 1. PASTA requires a max subproblem size of at least 2.  ''')
-             sys.exit(1)
+            MESSENGER.send_error(
+                ''' You have specified a max subproblem size of 1. PASTA requires a max subproblem size of at least 2.  ''')
+            sys.exit(1)
 
         delete_iteration_temps = not self.keep_iteration_temporaries
         delete_realignment_temps = delete_iteration_temps or (not self.keep_realignment_temporaries)
@@ -438,7 +445,7 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
             this_iter_score_improved = False
 
             while True:
-                break_strategy =  self._get_break_strategy(break_strategy_index)
+                break_strategy = self._get_break_strategy(break_strategy_index)
                 if not bool(break_strategy):
                     break
                 context_str = "iter%d-%s" % (self.current_iteration, break_strategy)
@@ -447,20 +454,21 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
                 curr_tmp_dir_par = self.pasta_team.temp_fs.create_subdir(curr_tmp_dir_par)
                 record_timestamp(os.path.join(curr_tmp_dir_par, 'start_align_timestamp.txt'))
                 # Align (with decomposition...)
-                self.status('Step %d. Realigning with decomposition strategy set to %s' % (self.current_iteration, break_strategy))
+                self.status('Step %d. Realigning with decomposition strategy set to %s' % (
+                    self.current_iteration, break_strategy))
                 if self.killed:
                     raise RuntimeError("PASTA Job killed")
                 tree_for_aligner = self.get_tree_copy()
                 aligner = PASTAAlignerJob(multilocus_dataset=self.multilocus_dataset,
-                                         pasta_team=self.pasta_team,
-                                         tree=tree_for_aligner,
-                                         tmp_base_dir=curr_tmp_dir_par,
-                                         reset_recursion_index=True,
-                                         skip_merge=self.pastamerge,
-                                         **configuration)
+                                          pasta_team=self.pasta_team,
+                                          tree=tree_for_aligner,
+                                          tmp_base_dir=curr_tmp_dir_par,
+                                          reset_recursion_index=True,
+                                          skip_merge=self.pastamerge,
+                                          **configuration)
                 self.pasta_aligner_job = aligner
                 aligner.launch_alignment(break_strategy=break_strategy,
-                                         context_str=context_str)                
+                                         context_str=context_str)
                 if self.pastamerge:
                     _LOG.debug("Build PASTA merge jobs")
                     subsets_tree = self.build_subsets_tree(curr_tmp_dir_par)
@@ -471,30 +479,29 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
                         new_multilocus_dataset = self.pasta_team.subsets.values()[0].get_results()
                     else:
                         pariwise_tmp_dir_par = os.path.join(curr_tmp_dir_par, "pw")
-                        pariwise_tmp_dir_par = self.pasta_team.temp_fs.create_subdir(pariwise_tmp_dir_par)    
+                        pariwise_tmp_dir_par = self.pasta_team.temp_fs.create_subdir(pariwise_tmp_dir_par)
                         pmj = PASTAMergerJob(multilocus_dataset=self.multilocus_dataset,
                                              pasta_team=self.pasta_team,
                                              tree=subsets_tree,
                                              tmp_base_dir=pariwise_tmp_dir_par,
-                                             reset_recursion_index=True,   
-                                             #delete_temps2=False,                                      
+                                             reset_recursion_index=True,
+                                             # delete_temps2=False,
                                              **configuration)
-                                                
+
                         pmj.launch_alignment(context_str=context_str)
-                        
+
                         # Start alignment jobs
                         for job in self.pasta_team.alignmentjobs:
                             jobq.put(job)
-                            
-                            
+
                         new_multilocus_dataset = pmj.get_results()
-                        del pmj  
-                    
+                        del pmj
+
                     self.pasta_team.alignmentjobs = []
-                    self.pasta_team.subsets = {}                                                                  
-                else:          
+                    self.pasta_team.subsets = {}
+                else:
                     new_multilocus_dataset = aligner.get_results()
-                
+
                 _LOG.debug("Alignment obtained. Preparing for tree.")
                 self.pasta_aligner_job = None
                 del aligner
@@ -507,21 +514,25 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
                     start_from = None
                 self.status('Step %d. Alignment obtained. Tree inference beginning...' % (self.current_iteration))
                 if self.killed:
-                    raise RuntimeError("PASTA Job killed")                             
-            
+                    raise RuntimeError("PASTA Job killed")
+
                 tbj = self.pasta_team.tree_estimator.create_job(new_multilocus_dataset,
-                                                               starting_tree=start_from,
-                                                               num_cpus=self.num_cpus,
-                                                               context_str=context_str + " tree",
-                                                               tmp_dir_par=curr_tmp_dir_par,
-                                                               delete_temps=delete_iteration_temps,
-                                                               pasta_products=pasta_products,
-                                                               step_num=self.current_iteration,
-                                                               mask_gappy_sites = self.mask_gappy_sites)
+                                                                starting_tree=start_from,
+                                                                num_cpus=self.num_cpus,
+                                                                context_str=context_str + " tree",
+                                                                tmp_dir_par=curr_tmp_dir_par,
+                                                                delete_temps=delete_iteration_temps,
+                                                                pasta_products=pasta_products,
+                                                                step_num=self.current_iteration,
+                                                                mask_gappy_sites=self.mask_gappy_sites)
                 prev_curr_align = self.curr_iter_align_tmp_filename
                 prev_curr_tree = self.curr_iter_tree_tmp_filename
-                self.curr_iter_align_tmp_filename = pasta_products.get_abs_path_for_iter_output(self.current_iteration, TEMP_SEQ_ALIGNMENT_TAG, allow_existing=True)
-                self.curr_iter_tree_tmp_filename = pasta_products.get_abs_path_for_iter_output(self.current_iteration, TEMP_TREE_TAG, allow_existing=True)
+                self.curr_iter_align_tmp_filename = pasta_products.get_abs_path_for_iter_output(self.current_iteration,
+                                                                                                TEMP_SEQ_ALIGNMENT_TAG,
+                                                                                                allow_existing=True)
+                self.curr_iter_tree_tmp_filename = pasta_products.get_abs_path_for_iter_output(self.current_iteration,
+                                                                                               TEMP_TREE_TAG,
+                                                                                               allow_existing=True)
 
                 self.tree_build_job = tbj
                 jobq.put(tbj)
@@ -540,13 +551,14 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
 
                 if self.best_score is None or new_score > self.best_score:
                     self.store_optimum_results(new_multilocus_dataset,
-                            new_tree_str,
-                            new_score,
-                            curr_timestamp)
+                                               new_tree_str,
+                                               new_score,
+                                               curr_timestamp)
                     this_iter_score_improved = True
                     accept_iteration = True
 
-                if self._get_accept_mode(new_score=new_score, break_strategy_index=break_strategy_index) == AcceptMode.BLIND_MODE:
+                if self._get_accept_mode(new_score=new_score,
+                                         break_strategy_index=break_strategy_index) == AcceptMode.BLIND_MODE:
                     if self.blind_mode_is_final:
                         self.is_stuck_in_blind = True
                         if self.switch_to_blind_timestamp is None:
@@ -565,17 +577,17 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
                     else:
                         self.status('realignment accepted and despite the score not improving.')
                     # we do not want to continue to try different breaking strategies for this iteration so we break
-                    self.status('current score: %s, best score: %s' % (self.score, self.best_score) )
+                    self.status('current score: %s, best score: %s' % (self.score, self.best_score))
                     break
                 else:
                     self.status('realignment NOT accepted.')
                     self.curr_iter_align_tmp_filename = prev_curr_align
-                    self.curr_iter_tree_tmp_filename = prev_curr_tree 
+                    self.curr_iter_tree_tmp_filename = prev_curr_tree
 
                 break_strategy_index += 1
 
                 # self.status('current score: %s, best score: %s' % (self.score, self.best_score) )
-                
+
             if not this_iter_score_improved:
                 self.num_iter_since_imp += 1
             self.current_iteration += 1
