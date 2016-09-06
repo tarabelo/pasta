@@ -33,6 +33,10 @@ class PastaUserSettings(UserSettingsContainer):
         self._categories.append('clustalw2')
         self.mafft = UserSettingGroup('mafft')
         self._categories.append('mafft')
+
+        self.sparkmafft = UserSettingGroup('sparkmafft')
+        self._categories.append('sparkmafft')
+
         self.hmmeralign = UserSettingGroup('hmmeralign')
         self._categories.append('hmmeralign')
         self.commandline = UserSettingGroup('commandline')
@@ -41,6 +45,10 @@ class PastaUserSettings(UserSettingsContainer):
         self._categories.append('prank')
         self.mafft.add_option('path', StringUserSetting(name='path', default='', short_name=None, help='Path to MAFFT executables', subcategory=None))
         self.mafft.add_option('args', StringUserSetting(name='args', default='', short_name=None, help='Arguments to be passed to Mafft.', subcategory=None))
+        self.sparkmafft.add_option('path', StringUserSetting(name='path', default='', short_name=None,
+                                                        help='Path to MAFFT executables', subcategory=None))
+        self.sparkmafft.add_option('args', StringUserSetting(name='args', default='', short_name=None,
+                                                        help='Arguments to be passed to Mafft.', subcategory=None))
         self.hmmeralign.add_option('path', StringUserSetting(name='path', default='', short_name=None, help='Path to hmmeralign script', subcategory=None))
         self.padaligner.add_option('path', StringUserSetting(name='path', default='', short_name=None, help='Path to pad_aligner.py executables', subcategory=None))
         self.fakealigner.add_option('path', StringUserSetting(name='path', default='', short_name=None, help='Path to fakealigner file (can be empty)', subcategory=None))
@@ -108,3 +116,6 @@ class PastaUserSettings(UserSettingsContainer):
         self.sate.add_option('output_directory', StringUserSetting(name='output_directory', default=None, short_name='o', help='directory for output files (defaults to input file directory)', subcategory='output'))
         self.sate.add_option('return_final_tree_and_alignment', BoolUserSetting(name='return_final_tree_and_alignment', default='True', short_name=None, help='Return the best likelihood tree and alignment pair instead of those from the last iteration; this is discouraged with masking option enabled.', subcategory='output'))
         self.sate.add_option('mask_gappy_sites', IntUserSetting(name='mask_gappy_sites', default=1, min=0, max=None, short_name=None, help='The minimum number of non-gap characters required in each column passed to the tree estimation step. Columns with fewer non-gap characters than the given threshold will be masked out before passing the alignment into the tree estimation module. These columns will be present in the final alignment. [default: 0.1% of alignment size]', subcategory='searching'))
+
+    #def setSparkMode(self):
+    #    self.sate['aligner'] = 'sparkmafft'
