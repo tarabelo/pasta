@@ -180,6 +180,8 @@ if platform.system() != "Windows":
     #create_symlink(os.path.abspath(os.path.join(pasta.PASTA_SCRIPT_RESOURCES, "mafft")))
     create_symlink(os.path.abspath(os.path.join(pasta.PASTA_SCRIPT_RESOURCES, "hmmeralign")))
 
+    os.symlink("mafft", "bin/sparkmafft")
+
     # others
     tools_bin_srcdir = pasta.pasta_tools_dev_dir()
     tools_bin_subdirs = ['', 'mafftdir/bin','mafftdir/libexec']
