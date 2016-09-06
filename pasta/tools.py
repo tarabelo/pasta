@@ -31,6 +31,7 @@ from alignment import Alignment
 from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG
 from pasta import get_logger, GLOBAL_DEBUG, PASTA_SYSTEM_PATHS_CFGFILE, DEFAULT_MAX_MB,\
     TEMP_SEQ_UNMASKED_ALIGNMENT_TAG
+from pasta import MESSENGER
 from pasta.filemgr import open_with_intermediates
 from pasta.scheduler import jobq, start_worker, DispatchableJob, FakeJob,\
     TickingDispatchableJob
@@ -160,7 +161,9 @@ class ExternalTool (object):
     def create_job(self, *args, **kwargs):
         raise NotImplementedError('Abstract ExternalTool class cannot spawn jobs.')
 
+
 class Aligner(ExternalTool):
+
     def __init__(self, name, temp_fs, **kwargs):
         ExternalTool.__init__(self, name, temp_fs, **kwargs)
         self.user_opts = kwargs.get('args', ' ').split()
@@ -213,6 +216,53 @@ class CustomAligner(Aligner):
 
     def create_job(self, alignment, guide_tree=None):
         raise NotImplementedError('User-provided Aligner NOT supported yet.')
+'''
+TODO: [JMAbuin] Change this class. Instead of launching an external process, call Spark to do the actual alignment
+From Inside Spark, launch the external process
+'''
+class SparkMafftAligner(Aligner):
+    #OLLO! A primeira parte deste string buscaa despois en PastaUserSettings como clave.
+    section_name = 'sparkmafft aligner'
+    url = 'http://align.bmr.kyushu-u.ac.jp/mafft/software'
+    is_bundled = True
+
+    def __init__(self, temp_fs, **kwargs):
+        MESSENGER.send_info("JMAbuin :: Entering in SparkMafftAligner")
+        Aligner.__init__(self, 'sparkmafft', temp_fs, **kwargs)
+
+    def create_job(self, alignment, guide_tree=None, **kwargs):
+        job_id = kwargs.get('context_str', '') + '_sparkmafft'
+        if alignment.get_num_taxa() == 0:
+            return FakeJob(alignment, context_str=job_id)
+        new_alignment = alignment.unaligned()
+        if new_alignment.get_num_taxa() < 2:
+            return FakeJob(new_alignment, context_str=job_id)
+        scratch_dir, seqfn, alignedfn = self._prepare_input(new_alignment, **kwargs)
+
+        invoc = []
+        if platform.system() == "Windows":
+            invoc.append(self.exe)
+        else:
+            invoc.extend([self.exe])
+        if len(alignment) <= 200 and new_alignment.max_sequence_length() < 50000:
+            invoc.extend(['--localpair', '--maxiterate', '1000'])
+        if '--ep' not in self.user_opts:
+            invoc.extend(['--ep', '0.123'])
+        invoc.extend(['--quiet'])
+        invoc.extend(self.user_opts)
+        invoc.extend(['--thread',str(kwargs.get('num_cpus', 1))])
+        invoc.append(seqfn)
+
+        # The MAFFT job creation is slightly different from the other
+        #   aligners because we redirect and read standard output.
+
+        return self._finish_standard_job(alignedfn=alignedfn,
+                datatype=alignment.datatype,
+                invoc=invoc,
+                scratch_dir=scratch_dir,
+                job_id=job_id,
+                delete_temps=kwargs.get('delete_temps', self.delete_temps),
+                stdout=alignedfn)
 
 
 class MafftAligner(Aligner):
@@ -221,6 +271,7 @@ class MafftAligner(Aligner):
     is_bundled = True
 
     def __init__(self, temp_fs, **kwargs):
+        MESSENGER.send_info("JMAbuin :: Entering in MafftAligner")
         Aligner.__init__(self, 'mafft', temp_fs, **kwargs)
 
     def create_job(self, alignment, guide_tree=None, **kwargs):
@@ -970,11 +1021,11 @@ class HMMERAlignAligner(Aligner):
                                         delete_temps=kwargs.get('delete_temps', self.delete_temps))
 
 if GLOBAL_DEBUG:
-    AlignerClasses = (ProbalignAligner, Clustalw2Aligner, MafftAligner, PrankAligner, OpalAligner, PadAligner, FakeAligner, CustomAligner, HMMERAlignAligner, ProbconsAligner)
+    AlignerClasses = (ProbalignAligner, Clustalw2Aligner, MafftAligner, PrankAligner, OpalAligner, PadAligner, FakeAligner, CustomAligner, HMMERAlignAligner, ProbconsAligner, SparkMafftAligner)
     MergerClasses = (MuscleMerger, OpalMerger)
     TreeEstimatorClasses = (FastTree, Randtree, Raxml, FakeTreeEstimator, CustomTreeEstimator)
 else:
-    AlignerClasses = (ProbalignAligner, Clustalw2Aligner, MafftAligner, PrankAligner, OpalAligner, MuscleAligner, CustomAligner, HMMERAlignAligner)
+    AlignerClasses = (ProbalignAligner, Clustalw2Aligner, MafftAligner, PrankAligner, OpalAligner, MuscleAligner, CustomAligner, HMMERAlignAligner, SparkMafftAligner)
     MergerClasses = (MuscleMerger, OpalMerger, CustomMerger)
     TreeEstimatorClasses = (Raxml, FastTree, CustomTreeEstimator)
 
