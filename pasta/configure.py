@@ -143,7 +143,7 @@ def init_spark():
     global sc
     if not sc:
         conf = SparkConf()
-        conf.set("spark.app.name", "Mi apli")
+        conf.set("spark.app.name", "PASTA Spark")
         sc = SparkContext(conf=conf)
     return sc
 
