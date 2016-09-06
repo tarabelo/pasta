@@ -38,6 +38,7 @@ from pasta.tools import *
 from pasta.treeholder import read_and_encode_splits, \
     generate_tree_with_splits_from_tree
 from pasta.utility import IndentedHelpFormatterWithNL
+from pasta.usersettingclasses import StringUserSetting
 
 _RunningJobs = None
 
@@ -165,6 +166,9 @@ def finish_pasta_execution(pasta_team,
     options = user_config.commandline
 
     user_config.save_to_filepath(os.path.join(temporaries_dir, 'last_used.cfg'))
+
+
+
     if options.timesfile:
         f = open_with_intermediates(options.timesfile, 'a')
         f.close()
@@ -374,10 +378,8 @@ def finish_pasta_execution(pasta_team,
         else:
             _RunningJobs = job
             MESSENGER.send_info("Starting PASTA algorithm on initial tree...")
-            MESSENGER.send_info("Checking is the code in running in SPARK");
-            sparkcontext = init_spark()
-            if sparkcontext:
-                MESSENGER.send_info("We are using Spark for alignment")
+
+
 
             job.run(tmp_dir_par=temporaries_dir, pasta_products=pasta_products)
             _RunningJobs = None
@@ -506,6 +508,8 @@ def run_pasta_from_config(user_config, pasta_products, multilocus_dataset):
         os.makedirs(
             par_dir)  # this parent directory will not be deleted, so we don't store it in the pasta_team.temp_fs
 
+#TODO: Here Chema. Pastateam esta en pastajob.py
+
     pasta_team = PastaTeam(config=user_config)
 
     delete_dir = not cmdline_options.keeptemp
@@ -621,6 +625,16 @@ def pasta_main(argv=sys.argv):
                                    version="%s v%s" % (PROGRAM_NAME, PROGRAM_VERSION))
 
     user_config = get_configuration()
+
+    MESSENGER.send_info("Checking if the code is running in SPARK");
+    sparkcontext = init_spark()
+    if sparkcontext:
+        MESSENGER.send_info("We are using Spark for alignment")
+        # user_config.sate['aligner'] = 'sparkmafft'
+        # user_config.sate.dict()['aligner'] = 'sparkmafft'
+
+        #user_config.sate.__setattr__('aligner', StringUserSetting(name='aligner', default='mafft', short_name=None, help='The name of the alignment program to use for subproblems. [default: sparkmafft]', subcategory='tools'))
+
     command_line_group = user_config.get('commandline')
     command_line_group.add_to_optparser(parser)
     sate_group = user_config.get('sate')
