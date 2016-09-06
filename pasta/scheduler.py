@@ -69,9 +69,9 @@ class LightJobForProcess():
         self.return_code = None # NOTE: This is sent back to the main process
         self.environ = environ
 
-    def read_stderr(self,_stderr_fo):
+    def read_stderr(self, _stderr_fo):
         if os.path.exists(_stderr_fo.name):
-            errFile = open(_stderr_fo.name,'r')
+            errFile = open(_stderr_fo.name, 'r')
             errorFromFile = errFile.read(-1)
             errFile.close()
             return errorFromFile
@@ -95,7 +95,7 @@ class LightJobForProcess():
             _stderr_fo = open_with_intermediates(os.path.join(proc_cwd, '.Job.stderr.txt'), 'w')
         k['stderr'] = _stderr_fo
 
-        for key,v in self.environ.items():
+        for key, v in self.environ.items():
             os.environ[key] = v
 
         process = Popen(self._invocation, stdin = PIPE, **k)
@@ -158,12 +158,12 @@ class worker():
     def __call__(self):                            
         while True:            
             job = jobq.get()            
-            ID=int(random() *10000000)
+            ID = int(random() *10000000)
             TIMING_LOG.info("%s (%d) started" % (str(job.context_str),ID))
             try:
                 if isinstance(job, DispatchableJob):
                     pa = job.start()
-                    plj = LightJobForProcess(pa[0],pa[1],os.environ)
+                    plj = LightJobForProcess(pa[0], pa[1], os.environ)
                     self.pqueue.put(plj)
                     
                     self.pqueue.join()   
@@ -242,7 +242,8 @@ class DispatchableJob(JobBase):
         global _all_dispatchable_jobs
         JobBase.__init__(self, **kwargs)
         self._invocation = invocation
-        # _LOG.debug('DispatchableJob.__init__(invocation= %s )' % " ".join(self._invocation))  # Not sure why it does not work with datatype in treebuild.create_job
+        # _LOG.debug('DispatchableJob.__init__(invocation= %s )' % " ".join(self._invocation))
+        # Not sure why it does not work with datatype in treebuild.create_job
         self.result_processor = result_processor
         self.return_code = None
         self.results = None
@@ -381,7 +382,7 @@ class TickingJob():
             for parent in self.parent_tickable_job:
                 parent.kill()            
 
-class TickingDispatchableJob(DispatchableJob,TickingJob):
+class TickingDispatchableJob(DispatchableJob, TickingJob):
     def __init__(self, invocation, result_processor, **kwargs):
         DispatchableJob.__init__(self, invocation, result_processor, **kwargs)
         TickingJob.__init__(self)
