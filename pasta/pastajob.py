@@ -40,7 +40,7 @@ from pasta.utility import record_timestamp
 from pasta.scheduler import jobq
 from pasta.filemgr import TempFS
 from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG, MESSENGER
-from pasta.configure import init_spark
+from pasta.configure_spark import get_sparkcontext
 
 class PastaTeam(object):
     '''A blob for holding the appropriate merger, alignment, and tree_estimator tools
@@ -56,7 +56,7 @@ class PastaTeam(object):
         try:
             max_mem_mb = config.sate.max_mem_mb
             self._temp_fs = TempFS()
-            sparkcontext = init_spark()
+            sparkcontext = get_sparkcontext()
             if sparkcontext:
                 MESSENGER.send_info("[PastaTeam] We are using Spark for alignment")
                 self.aligner = config.create_aligner(temp_fs=self._temp_fs, name="sparkmafft")

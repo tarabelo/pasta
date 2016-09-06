@@ -131,7 +131,7 @@ def write_fasta(alignment, dest):
 def write_fasta_hdfs(alignment, dest):
     """Writes the `alignment` in FASTA format to HDFS"""
     assert isinstance(dest, str)
-    from configure import get_sparkcontext
+    from configure_spark import get_sparkcontext
     sc = get_sparkcontext()
     data = sc.parallelize(alignment.items())
     data.saveAsSequenceFile(dest)
@@ -411,7 +411,7 @@ class Alignment(dict, object):
 
     def write_filepath(self, filename, file_format='FASTA', zipout=False):
         """Writes the sequence data in the specified `file_format` to `filename`"""
-        from configure import get_sparkcontext
+        from configure_spark import get_sparkcontext
         using_spark = get_sparkcontext()
         if not using_spark:
             file_obj = open_with_intermediates(filename, 'w')

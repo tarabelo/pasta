@@ -28,6 +28,7 @@ import sys
 import time
 
 from alignment import Alignment
+from pasta.configure_spark import get_sparkcontext
 from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG
 from pasta import get_logger, GLOBAL_DEBUG, PASTA_SYSTEM_PATHS_CFGFILE, DEFAULT_MAX_MB,\
     TEMP_SEQ_UNMASKED_ALIGNMENT_TAG
@@ -35,6 +36,7 @@ from pasta import MESSENGER
 from pasta.filemgr import open_with_intermediates
 from pasta.scheduler import jobq, start_worker, DispatchableJob, FakeJob,\
     TickingDispatchableJob
+
 
 _LOG = get_logger(__name__)
 
@@ -226,11 +228,20 @@ class SparkMafftAligner(Aligner):
     url = 'http://align.bmr.kyushu-u.ac.jp/mafft/software'
     is_bundled = True
 
+
     def __init__(self, temp_fs, **kwargs):
         MESSENGER.send_info("JMAbuin :: Entering in SparkMafftAligner")
         Aligner.__init__(self, 'sparkmafft', temp_fs, **kwargs)
 
+    #def create_job_executor(selfself, alignment, guide_tree=None, **kwargs):
+
     def create_job(self, alignment, guide_tree=None, **kwargs):
+
+        sparkcontext = get_sparkcontext()
+        if not sparkcontext:
+            exit(-1)
+
+
         job_id = kwargs.get('context_str', '') + '_sparkmafft'
         if alignment.get_num_taxa() == 0:
             return FakeJob(alignment, context_str=job_id)

@@ -127,39 +127,3 @@ def get_input_source_directory(config):
         return os.path.dirname(os.path.abspath(options.input))
 
 
-sc = None
-
-
-def init_spark():
-    """
-    Init the SPARK context if we are running in a spark cluster
-    :return: The SparkContext, if we are using Spark; false otherwise
-    """
-    try:
-        # noinspection PyUnresolvedReferences,PyUnresolvedReferences
-        from pyspark import SparkConf, SparkContext
-    except ImportError:
-        return False
-    global sc
-    if not sc:
-        conf = SparkConf()
-        conf.set("spark.app.name", "PASTA Spark")
-        sc = SparkContext(conf=conf)
-    return sc
-
-
-def finish_spark():
-    """
-    Set the SparkContext to None so avoid to use again
-    """
-    global sc
-    sc = None
-
-
-def get_sparkcontext():
-    """
-    Get the actual SparkContext
-    :return: the SparkContext
-    """
-    global sc
-    return sc

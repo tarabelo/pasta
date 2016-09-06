@@ -31,14 +31,13 @@ from pasta import PROGRAM_NAME, PROGRAM_VERSION, PROGRAM_LONG_DESCRIPTION, set_t
 from pasta import filemgr
 from pasta.alignment import MultiLocusDataset, compact
 from pasta.configure import get_configuration
-from pasta.configure import init_spark
+from pasta.configure_spark import init_spark
 from pasta.pastajob import *
 from pasta.scheduler import stop_worker
 from pasta.tools import *
 from pasta.treeholder import read_and_encode_splits, \
     generate_tree_with_splits_from_tree
 from pasta.utility import IndentedHelpFormatterWithNL
-from pasta.usersettingclasses import StringUserSetting
 
 _RunningJobs = None
 
