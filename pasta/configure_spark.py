@@ -20,7 +20,6 @@ In general one should be able to simply call get_configuration()
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 sc = None
 
 
@@ -57,3 +56,43 @@ def get_sparkcontext():
     """
     global sc
     return sc
+
+
+def spark_align(joblist):
+    import os
+    global sc
+    from scheduler import LightJobForProcess
+
+    lightjoblist = list()
+    for job in joblist:
+        pa = job.start()
+        pa[0][-1] += '/part-00000'
+        data = sc.sequenceFile(pa[0][-1], 'org.apache.hadoop.io.Text', 'org.apache.hadoop.io.Text')
+        lightjoblist.append([LightJobForProcess(pa[0], pa[1], os.environ), data.collectAsMap()])
+
+    rdd_joblist = sc.parallelize(lightjoblist)
+
+    rdd_joblist.foreach(do_align)
+    sc = None
+
+    for job in joblist:
+        job.results = job.result_processor()
+        job.finished_event.set()
+        job.get_results()
+        job.postprocess()
+
+
+def do_align(job):
+    global sc
+    # Save data in local disc
+    from tempfile import NamedTemporaryFile
+    tmpfile = NamedTemporaryFile(delete=False)
+    write_to_local(job[1], tmpfile)
+    job[0]._invocation[-1] = tmpfile.name
+    job[0].run()
+
+
+def write_to_local(data, dest):
+    """Writes the data in FASTA format to a temporary file"""
+    for name in data.keys():
+        dest.write('>%s\n%s\n' % (name, data[name]))

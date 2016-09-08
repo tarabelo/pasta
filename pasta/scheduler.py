@@ -20,15 +20,17 @@
 
 # Jiaye Yu and Mark Holder, University of Kansas
 
-import os, traceback
-from cStringIO import StringIO
+import os
+import traceback
 from Queue import Queue
-from threading import Thread, Event, Lock
+from cStringIO import StringIO
 from multiprocessing import Process, Manager, Value
+from random import random
 from subprocess import Popen, PIPE
+from threading import Thread, Event, Lock
+
 from pasta import get_logger, TIMING_LOG
 from pasta.filemgr import open_with_intermediates
-from random import random
 
 _LOG = get_logger(__name__)
 
@@ -98,6 +100,7 @@ class LightJobForProcess():
         for key, v in self.environ.items():
             os.environ[key] = v
 
+        print('Launching %s.' % " ".join(self._invocation))
         process = Popen(self._invocation, stdin = PIPE, **k)
 
         err_msg = []                

@@ -10,12 +10,13 @@ File and path management.
 """
 
 import os
-import sys
 import re
+import sys
 import tempfile
-import shutil
 from threading import Lock
+
 from pasta import get_logger
+
 _LOG = get_logger(__name__)
 
 _ILLEGAL_FILENAME_PATTERN = re.compile(r'[^-_a-zA-Z0-9.]')
@@ -200,6 +201,10 @@ class TempFS(object):
         listed as one of the directories created by this TempFS object (or raises
         a ValueError if it is not listed).
         '''
+        # TODO: SPARK cleaning is different
+        from configure_spark import get_sparkcontext
+        if get_sparkcontext():
+            return True
         self._directories_created_lock.acquire()
         real_path = os.path.abspath(real_path)
         try:
