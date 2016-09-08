@@ -59,7 +59,8 @@ class PastaTeam(object):
             sparkcontext = get_sparkcontext()
             if sparkcontext:
                 MESSENGER.send_info("[PastaTeam] We are using Spark for alignment")
-                self.aligner = config.create_aligner(temp_fs=self._temp_fs, name="sparkmafft")
+                #self.aligner = config.create_aligner(temp_fs=self._temp_fs, name="sparkmafft")
+                self.aligner = config.create_aligner(temp_fs=self._temp_fs)
             else:
                 MESSENGER.send_info("[PastaTeam] We are NOT using Spark for alignment")
                 self.aligner = config.create_aligner(temp_fs=self._temp_fs)
