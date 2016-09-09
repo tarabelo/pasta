@@ -100,7 +100,6 @@ class LightJobForProcess():
         for key, v in self.environ.items():
             os.environ[key] = v
 
-        print('Launching %s.' % " ".join(self._invocation))
         process = Popen(self._invocation, stdin = PIPE, **k)
 
         err_msg = []                
