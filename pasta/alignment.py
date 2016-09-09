@@ -429,8 +429,10 @@ class Alignment(dict, object):
         """Writes the sequence data in the specified `file_format` to `file_obj`"""
         if (file_format.upper() == 'FASTA'):
             write_func = write_fasta
+        # TODO: Eliminate the writing in HDFS
         elif (file_format.upper() == 'FASTA-SPARK'):
-            write_func = write_fasta_hdfs
+            # write_func = write_fasta_hdfs
+            write_func = write_fasta
         elif (file_format.upper() == 'NEXUS'):
             write_func = write_nexus
         elif (file_format.upper() == 'PHYLIP'):
