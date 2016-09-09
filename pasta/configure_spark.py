@@ -66,15 +66,23 @@ def spark_align(joblist):
     lightjoblist = list()
     for job in joblist:
         pa = job.start()
-        pa[0][-1] += '/part-00000'
-        data = sc.sequenceFile(pa[0][-1], 'org.apache.hadoop.io.Text', 'org.apache.hadoop.io.Text')
-        lightjoblist.append([LightJobForProcess(pa[0], pa[1], os.environ), data.collectAsMap()])
 
+        # pa[0][-1] += '/part-00000'
+        # data = sc.sequenceFile(pa[0][-1], 'org.apache.hadoop.io.Text', 'org.apache.hadoop.io.Text')
+        # lightjoblist.append([LightJobForProcess(pa[0], pa[1], os.environ), data.collectAsMap()])
+        # Read the input.fasta file and store as a list
+        with open(pa[0][-1], 'r') as f:
+            data = f.readlines()
+        # Create a list of pairs (job, data)
+        lightjoblist.append((LightJobForProcess(pa[0], pa[1], os.environ), data))
+
+    # Parallelize the list of pairs (job, data)
     rdd_joblist = sc.parallelize(lightjoblist)
 
+    # For each pair, do alignment
     rdd_joblist.foreach(do_align)
-    sc = None
 
+    # Finish the jobs
     for job in joblist:
         job.results = job.result_processor()
         job.finished_event.set()
@@ -84,12 +92,18 @@ def spark_align(joblist):
 
 def do_align(job):
     global sc
-    # Save data in local disc
+    # Save data in local disc in a temporary file
     from tempfile import NamedTemporaryFile
-    tmpfile = NamedTemporaryFile(delete=False)
-    write_to_local(job[1], tmpfile)
+    tmpfile = NamedTemporaryFile()
+    # write the data
+    tmpfile.writelines(job[1])
+    # write_to_local(job[1], tmpfile)
+    # Change the name of the input file
     job[0]._invocation[-1] = tmpfile.name
+    tmpfile.flush()
+    # Run the job
     job[0].run()
+    tmpfile.close()
 
 
 def write_to_local(data, dest):
