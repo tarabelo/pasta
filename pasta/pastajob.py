@@ -500,7 +500,7 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
 
                         # Start alignment jobs
                         if get_sparkcontext():
-                            from configure_spark import spark_align
+                            from spark_align import spark_align
                             spark_align(self.pasta_team.alignmentjobs)
                         else:
                             for job in self.pasta_team.alignmentjobs:
