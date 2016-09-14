@@ -119,9 +119,51 @@ class LightJobForProcess():
             _LOG.debug('Finished %s.\n Return code: %s; %s' % (" ".join(self._invocation), self.return_code, self.error))        
         except Exception as e:
             err_msg.append(str(e))
-            self.error = "\n".join(err_msg) 
-            _LOG.error(self.error)   
-            
+            self.error = "\n".join(err_msg)
+            _LOG.error(self.error)
+
+    def runwithpipes(self):
+        from tempfile import mkdtemp
+
+        _LOG.debug('launching %s.' % " ".join(self._invocation))
+        k = self._k
+        proc_cwd = k.get('cwd', os.curdir)
+        tmpdir = mkdtemp()
+        filename = os.path.join(tmpdir, 'errfifo')
+        os.mkfifo(filename)
+        _stderr_fo = open(filename, 'w+b')
+
+        k['stderr'] = PIPE
+        k['stdout'] = PIPE
+
+        for key, v in self.environ.items():
+            os.environ[key] = v
+
+        process = Popen(self._invocation, stdin=PIPE, **k)
+
+        err_msg = []
+        err_msg.append("PASTA failed because one of the programs it tried to run failed.")
+        err_msg.append('The invocation that failed was: \n    "%s"\n' % '" "'.join(self._invocation))
+        try:
+            self.return_code = process.wait()
+            output = process.stdout.readlines()
+            process.stdin.close()
+            process.stdout.close()
+
+            if self.return_code:
+                errorFromFile = self.read_stderr(_stderr_fo)
+                if errorFromFile:
+                    err_msg.append(errorFromFile)
+                self.error = "\n".join(err_msg)
+                raise Exception("")
+            _LOG.debug(
+                'Finished %s.\n Return code: %s; %s' % (" ".join(self._invocation), self.return_code, self.error))
+        except Exception as e:
+            err_msg.append(str(e))
+            self.error = "\n".join(err_msg)
+            _LOG.error(self.error)
+        return output
+
 class pworker():
     def __init__(self, q, err_shared_obj):
         self.q = q

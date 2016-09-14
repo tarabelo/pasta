@@ -40,10 +40,13 @@ def spark_align(joblist):
 
     # Parallelize the list of pairs (job, data)
     rdd_joblist = sc.parallelize(lightjoblist)
+    # for j in lightjoblist:
+    #    do_align(j)
 
     # For each pair, do alignment
     # as output, get an RDD with pairs (out_filename, out_data)
     out = rdd_joblist.map(do_align)
+
     # Collect out and write the data to corresponding files in master's disk
     results = out.collect()
     for res in results:
@@ -63,7 +66,7 @@ def do_align(job):
     # Save data in local disc in a temporary file
     from tempfile import NamedTemporaryFile
     intmp = NamedTemporaryFile()
-    outtmp = NamedTemporaryFile()
+    # outtmp = NamedTemporaryFile()
     # write the  inputdata
     intmp.writelines(job[1])
     # write_to_local(job[1], tmpfile)
@@ -72,13 +75,10 @@ def do_align(job):
     intmp.flush()
     # Change the name of the output file
     outfile = job[0]._k['stdout']
-    job[0]._k['stdout'] = outtmp.name
-    # Run the job
-    job[0].run()
+    # Run the job and Save in the rdd the name and data of the output file
+    out = (outfile, job[0].runwithpipes())
     intmp.close()
-    # Save in the rdd the name and data of the output file
-    out = (outfile, outtmp.readlines())
-    outtmp.close()
+    #outtmp.close()
     return out
 
 
