@@ -40,7 +40,7 @@ from pasta.utility import record_timestamp
 from pasta.scheduler import jobq
 from pasta.filemgr import TempFS
 from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG, MESSENGER
-from pasta.configure_spark import get_sparkcontext
+from pasta.configure_spark import get_sparkcontext, isSpark, setSpark
 
 class PastaTeam(object):
     '''A blob for holding the appropriate merger, alignment, and tree_estimator tools
@@ -56,15 +56,7 @@ class PastaTeam(object):
         try:
             max_mem_mb = config.sate.max_mem_mb
             self._temp_fs = TempFS()
-            sparkcontext = get_sparkcontext()
-            if sparkcontext:
-                MESSENGER.send_info("[PastaTeam] We are using Spark for alignment")
-                #self.aligner = config.create_aligner(temp_fs=self._temp_fs, name="sparkmafft")
-                self.aligner = config.create_aligner(temp_fs=self._temp_fs)
-            else:
-                MESSENGER.send_info("[PastaTeam] We are NOT using Spark for alignment")
-                self.aligner = config.create_aligner(temp_fs=self._temp_fs)
-
+            self.aligner = config.create_aligner(temp_fs=self._temp_fs)
             self.aligner.max_mem_mb = max_mem_mb
             self.hmmeralign = config.create_aligner(temp_fs=self._temp_fs, name="hmmeralign")
             self.merger = config.create_merger(temp_fs=self._temp_fs)
@@ -500,8 +492,14 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
 
                         # Start alignment jobs
                         if get_sparkcontext():
+                            if not isSpark():
+                                _LOG.debug("Activating Spark")
+                                setSpark(True)
                             from spark_align import spark_align
                             spark_align(self.pasta_team.alignmentjobs)
+                            if isSpark():
+                                _LOG.debug("Deactivating Spark")
+                                setSpark(False)
                         else:
                             for job in self.pasta_team.alignmentjobs:
                                 jobq.put(job)

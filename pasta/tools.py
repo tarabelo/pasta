@@ -28,15 +28,14 @@ import sys
 import time
 
 from alignment import Alignment
-from pasta.configure_spark import get_sparkcontext
+from pasta import MESSENGER
 from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG
 from pasta import get_logger, GLOBAL_DEBUG, PASTA_SYSTEM_PATHS_CFGFILE, DEFAULT_MAX_MB,\
     TEMP_SEQ_UNMASKED_ALIGNMENT_TAG
-from pasta import MESSENGER
+from pasta.configure_spark import get_sparkcontext, setSpark, isSpark
 from pasta.filemgr import open_with_intermediates
 from pasta.scheduler import jobq, start_worker, DispatchableJob, FakeJob,\
     TickingDispatchableJob
-
 
 _LOG = get_logger(__name__)
 
@@ -173,6 +172,12 @@ class Aligner(ExternalTool):
     def _prepare_input(self, alignment, **kwargs):
         """Wraps up the writing of raw fasta, creation of temp dir, ... for common aligners.
         Returns directory, input filename, output filename."""
+        # If running spark, activate it
+        if get_sparkcontext():
+            if not isSpark():
+                _LOG.debug("Activating Spark")
+                setSpark(True)
+
         tdp = kwargs.get('tmp_dir_par')
         if not tdp:
             raise AssertionError('The tmp_dir_par must be specified when calling create_job or _prepare_input')
@@ -218,12 +223,8 @@ class CustomAligner(Aligner):
 
     def create_job(self, alignment, guide_tree=None):
         raise NotImplementedError('User-provided Aligner NOT supported yet.')
-'''
-TODO: [JMAbuin] Change this class. Instead of launching an external process, call Spark to do the actual alignment
-From Inside Spark, launch the external process
-'''
+
 class SparkMafftAligner(Aligner):
-    #OLLO! A primeira parte deste string buscaa despois en PastaUserSettings como clave.
     section_name = 'sparkmafft aligner'
     url = 'http://align.bmr.kyushu-u.ac.jp/mafft/software'
     is_bundled = True
@@ -543,6 +544,11 @@ class Merger(ExternalTool):
         self.user_opts = kwargs.get('args', ' ').split()
 
     def _prepare_input(self, alignment1, alignment2, **kwargs):
+        # If running Spark, deactivate it
+        if get_sparkcontext():
+            if isSpark():
+                _LOG.debug('Deactivating Spark')
+                setSpark(False)
         scratch_dir = self.make_temp_workdir(tmp_dir_par=kwargs['tmp_dir_par'])
         seqfn1 = os.path.join(scratch_dir, "1.fasta")
         seqfn2 = os.path.join(scratch_dir, "2.fasta")

@@ -22,6 +22,8 @@
 
 sc = None
 
+FlagSpark = False
+
 def init_spark():
     """
     Init the SPARK context if we are running in a spark cluster
@@ -37,6 +39,7 @@ def init_spark():
         conf = SparkConf()
         conf.set("spark.app.name", "PASTA Spark")
         sc = SparkContext(conf=conf)
+        setSpark(True)
     return sc
 
 
@@ -57,4 +60,11 @@ def get_sparkcontext():
     return sc
 
 
+def setSpark(flag):
+    global FlagSpark
+    FlagSpark = flag
 
+
+def isSpark():
+    global FlagSpark
+    return FlagSpark

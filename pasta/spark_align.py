@@ -21,27 +21,35 @@
 # Tomas F. Pena and Jose M. Abuin, University of Santiago de Compostela (Spain)
 import os
 
-from configure_spark import get_sparkcontext
+from configure_spark import get_sparkcontext, setSpark
+from pasta import get_logger
 from scheduler import LightJobForProcess
 
+_LOG = get_logger(__name__)
+
+input_data = dict()
+
+
+def set_input_data(dest, data):
+    global input_data
+    input_data[dest] = data
 
 def spark_align(joblist):
+    _LOG.debug("SPARK alignment starting")
     sc = get_sparkcontext()
-
+    global input_data
     lightjoblist = list()
     for job in joblist:
         pa = job.start()
-        # Read the input data
-        # TODO Avoid to use the disk and create the list lightjoblist directly
-        with open(pa[0][-1], 'r') as f:
-            data = f.readlines()
         # Create a list of pairs (job, data)
-        lightjoblist.append((LightJobForProcess(pa[0], pa[1], os.environ), data))
+        lightjoblist.append((LightJobForProcess(pa[0], pa[1], os.environ), input_data[pa[0][-1]].items()))
 
     # Parallelize the list of pairs (job, data)
     rdd_joblist = sc.parallelize(lightjoblist)
+
+    # This two lines are for testing purposes only
     # for j in lightjoblist:
-    #    do_align(j)
+    #   do_align(j)
 
     # For each pair, do alignment
     # as output, get an RDD with pairs (out_filename, out_data)
@@ -52,6 +60,11 @@ def spark_align(joblist):
     for res in results:
         with open(res[0], mode='w+b') as f:
             f.writelines(res[1])
+
+    # Switch down Spark
+    _LOG.debug("SPARK alignment finished")
+    _LOG.debug("Deactivating Spark")
+    setSpark(False)
 
     # Finish the jobs
     for job in joblist:
@@ -65,11 +78,18 @@ def do_align(job):
     global sc
     # Save data in local disc in a temporary file
     from tempfile import NamedTemporaryFile
-    intmp = NamedTemporaryFile()
+    try:
+        intmp = NamedTemporaryFile(delete=True)
+        _LOG.debug('Created NamedTemporaryFile %s' % intmp.name)
+    except Exception as e:
+        _LOG.error('Error creating NamedTemporaryFile')
     # outtmp = NamedTemporaryFile()
+
     # write the  inputdata
-    intmp.writelines(job[1])
-    # write_to_local(job[1], tmpfile)
+    # intmp.writelines(job[1])
+
+    write_fasta_format(job[1], intmp)
+
     # Change the name of the input file
     job[0]._invocation[-1] = intmp.name
     intmp.flush()
@@ -82,7 +102,7 @@ def do_align(job):
     return out
 
 
-def write_to_local(data, dest):
-    """Writes the data in FASTA format to a temporary file"""
-    for name in data.keys():
-        dest.write('>%s\n%s\n' % (name, data[name]))
+def write_fasta_format(alignment, fdest):
+    """Writes the `alignment` in FASTA format to a file"""
+    for name, seq in alignment:
+        fdest.write('>%s\n%s\n' % (name, seq))

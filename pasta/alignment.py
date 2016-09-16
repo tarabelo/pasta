@@ -128,14 +128,16 @@ def write_fasta(alignment, dest):
         file_obj.close()
 
 
-def write_fasta_hdfs(alignment, dest):
-    """Writes the `alignment` in FASTA format to HDFS"""
+def write_fasta_spark(alignment, dest):
+    """Writes the `alignment` in FASTA format directly to a RDD"""
     assert isinstance(dest, str)
-    from configure_spark import get_sparkcontext
-    sc = get_sparkcontext()
-    data = sc.parallelize(alignment.items())
-    data.saveAsSequenceFile(dest)
-
+    from spark_align import set_input_data
+    # I think that this lock is not neccessary
+    # from threading import RLock
+    # lock = RLock()
+    # lock.acquire()
+    set_input_data(dest, alignment)
+    # lock.release()
 
 def write_compact_to_fasta(alignment, dest):
     """Writes the `alignment` in FASTA format to either a file object or file"""
@@ -411,9 +413,8 @@ class Alignment(dict, object):
 
     def write_filepath(self, filename, file_format='FASTA', zipout=False):
         """Writes the sequence data in the specified `file_format` to `filename`"""
-        from configure_spark import get_sparkcontext
-        using_spark = get_sparkcontext()
-        if not using_spark:
+        from configure_spark import isSpark
+        if not isSpark():
             file_obj = open_with_intermediates(filename, 'w')
             if zipout:
                 import gzip
@@ -429,10 +430,9 @@ class Alignment(dict, object):
         """Writes the sequence data in the specified `file_format` to `file_obj`"""
         if (file_format.upper() == 'FASTA'):
             write_func = write_fasta
-        # TODO: Eliminate the writing in HDFS
         elif (file_format.upper() == 'FASTA-SPARK'):
-            # write_func = write_fasta_hdfs
-            write_func = write_fasta
+            write_func = write_fasta_spark
+            # write_func = write_fasta
         elif (file_format.upper() == 'NEXUS'):
             write_func = write_nexus
         elif (file_format.upper() == 'PHYLIP'):

@@ -507,8 +507,6 @@ def run_pasta_from_config(user_config, pasta_products, multilocus_dataset):
         os.makedirs(
             par_dir)  # this parent directory will not be deleted, so we don't store it in the pasta_team.temp_fs
 
-#TODO: Here Chema. Pastateam esta en pastajob.py
-
     pasta_team = PastaTeam(config=user_config)
 
     delete_dir = not cmdline_options.keeptemp
@@ -628,7 +626,7 @@ def pasta_main(argv=sys.argv):
     MESSENGER.send_info("Checking if the code is running in SPARK");
     sparkcontext = init_spark()
     if sparkcontext:
-        MESSENGER.send_info("We are using Spark for alignment")
+        MESSENGER.send_info("[PastaSpark Team] We are using Spark for alignment")
         # user_config.sate['aligner'] = 'sparkmafft'
         # user_config.sate.dict()['aligner'] = 'sparkmafft'
 

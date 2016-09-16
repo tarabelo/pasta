@@ -202,8 +202,8 @@ class TempFS(object):
         a ValueError if it is not listed).
         '''
         # TODO: SPARK cleaning is different
-        from configure_spark import get_sparkcontext
-        if get_sparkcontext():
+        from configure_spark import isSpark
+        if isSpark():
             return True
         self._directories_created_lock.acquire()
         real_path = os.path.abspath(real_path)
