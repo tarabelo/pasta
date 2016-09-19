@@ -20,13 +20,17 @@
 
 # Jiaye Yu and Mark Holder, University of Kansas
 
+import errno
 import os
 import traceback
 from Queue import Queue
 from cStringIO import StringIO
+from contextlib import contextmanager
 from multiprocessing import Process, Manager, Value
 from random import random
+from shutil import rmtree
 from subprocess import Popen, PIPE
+from tempfile import mkdtemp
 from threading import Thread, Event, Lock
 
 from pasta import get_logger, TIMING_LOG
@@ -61,6 +65,21 @@ def kill_all_jobs():
     for job in _all_dispatchable_jobs:
         job.kill()
     set_all_events()
+
+
+@contextmanager
+def TemporaryDirectory():
+    name = mkdtemp()
+    try:
+        yield name
+    finally:
+        try:
+            rmtree(name)
+        except OSError as e:
+            # Reraise unless ENOENT: No such file or directory
+            # (ok if directory has already been deleted)
+            if e.errno != errno.ENOENT:
+                raise
 
 class LightJobForProcess():
 
@@ -123,48 +142,43 @@ class LightJobForProcess():
             _LOG.error(self.error)
 
     def runwithpipes(self):
-        from tempfile import mkdtemp
-
-        _LOG.debug('launching %s.' % " ".join(self._invocation))
         k = self._k
-        tmpdir = mkdtemp()
-        filename = os.path.join(tmpdir, 'errfifo')
-        os.mkfifo(filename)
-        _stderr_fo = open(filename, 'w+b')
+        # Use a working temporary directory in the cluster nodes
+        with TemporaryDirectory() as tempdir:
+            k['cwd'] = tempdir
+            k['stderr'] = PIPE
+            k['stdout'] = PIPE
 
-        k['cwd'] = tmpdir
-        k['stderr'] = PIPE
-        k['stdout'] = PIPE
+            for key, v in self.environ.items():
+                os.environ[key] = v
 
-        for key, v in self.environ.items():
-            os.environ[key] = v
+            _LOG.debug('Launching %s.' % " ".join(self._invocation))
+            _LOG.debug('Options %s.', k)
+            process = Popen(self._invocation, stdin=PIPE, **k)
 
-        _LOG.debug('Launching %s.' % " ".join(self._invocation))
-        _LOG.debug('Options %s.', k)
-        process = Popen(self._invocation, stdin=PIPE, **k)
+            err_msg = []
+            err_msg.append("PASTA failed because one of the programs it tried to run failed.")
+            err_msg.append('The invocation that failed was: \n    "%s"\n' % '" "'.join(self._invocation))
+            try:
+                (output, output_err) = process.communicate()
+                self.return_code = process.returncode
+                process.stdin.close()
+                process.stdout.close()
+                process.stderr.close()
 
-        err_msg = []
-        err_msg.append("PASTA failed because one of the programs it tried to run failed.")
-        err_msg.append('The invocation that failed was: \n    "%s"\n' % '" "'.join(self._invocation))
-        try:
-            self.return_code = process.wait()
-            output = process.stdout.readlines()
-            process.stdin.close()
-            process.stdout.close()
-
-            if self.return_code:
-                errorFromFile = self.read_stderr(_stderr_fo)
-                if errorFromFile:
-                    err_msg.append(errorFromFile)
+                if self.return_code:
+                    # errorFromFile = self.read_stderr(_stderr_fo)
+                    if output_err:
+                        err_msg.append(output_err)
+                    self.error = "\n".join(err_msg)
+                    raise Exception("")
+                _LOG.debug(
+                    'Finished %s.\n Return code: %s; %s' % (" ".join(self._invocation), self.return_code, self.error))
+            except Exception as e:
+                err_msg.append(str(e))
                 self.error = "\n".join(err_msg)
-                raise Exception("")
-            _LOG.debug(
-                'Finished %s.\n Return code: %s; %s' % (" ".join(self._invocation), self.return_code, self.error))
-        except Exception as e:
-            err_msg.append(str(e))
-            self.error = "\n".join(err_msg)
-            _LOG.error(self.error)
-        return output
+                _LOG.error(self.error)
+            return output
 
 class pworker():
     def __init__(self, q, err_shared_obj):
