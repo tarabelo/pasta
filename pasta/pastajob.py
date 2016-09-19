@@ -491,6 +491,7 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
                         pmj.launch_alignment(context_str=context_str)
 
                         # Start alignment jobs
+                        _LOG.debug("Start alignment jobs. Number of jobs = " + str(len(self.pasta_team.alignmentjobs)))
                         if get_sparkcontext():
                             if not isSpark():
                                 _LOG.debug("Activating Spark")
