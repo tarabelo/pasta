@@ -79,26 +79,25 @@ def do_align(job):
     # Save data in local disc in a temporary file
     from tempfile import NamedTemporaryFile
     try:
-        intmp = NamedTemporaryFile(delete=True)
+        intmp = NamedTemporaryFile(delete=True, prefix='pasta')
         _LOG.debug('Created NamedTemporaryFile %s' % intmp.name)
     except Exception as e:
         _LOG.error('Error creating NamedTemporaryFile')
-    # outtmp = NamedTemporaryFile()
 
-    # write the  inputdata
-    # intmp.writelines(job[1])
-
+    # Write the input data in fasta format
     write_fasta_format(job[1], intmp)
 
     # Change the name of the input file
     job[0]._invocation[-1] = intmp.name
+    # If the file is closed, it's deleted, so we flush it
     intmp.flush()
-    # Change the name of the output file
+    # Save the name of the output file
     outfile = job[0]._k['stdout']
+
     # Run the job and Save in the rdd the name and data of the output file
     out = (outfile, job[0].runwithpipes())
+    # Close and delete the file
     intmp.close()
-    #outtmp.close()
     return out
 
 
