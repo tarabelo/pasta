@@ -127,18 +127,20 @@ class LightJobForProcess():
 
         _LOG.debug('launching %s.' % " ".join(self._invocation))
         k = self._k
-        proc_cwd = k.get('cwd', os.curdir)
         tmpdir = mkdtemp()
         filename = os.path.join(tmpdir, 'errfifo')
         os.mkfifo(filename)
         _stderr_fo = open(filename, 'w+b')
 
+        k['cwd'] = tmpdir
         k['stderr'] = PIPE
         k['stdout'] = PIPE
 
         for key, v in self.environ.items():
             os.environ[key] = v
 
+        _LOG.debug('Launching %s.' % " ".join(self._invocation))
+        _LOG.debug('Options %s.', k)
         process = Popen(self._invocation, stdin=PIPE, **k)
 
         err_msg = []
