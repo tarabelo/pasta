@@ -985,7 +985,9 @@ class HMMERAlignAligner(Aligner):
                                         delete_temps=kwargs.get('delete_temps', self.delete_temps))
 
 if GLOBAL_DEBUG:
-    AlignerClasses = (ProbalignAligner, Clustalw2Aligner, MafftAligner, PrankAligner, OpalAligner, PadAligner, FakeAligner, CustomAligner, HMMERAlignAligner, ProbconsAligner, SparkMafftAligner)
+    AlignerClasses = (
+    ProbalignAligner, Clustalw2Aligner, MafftAligner, PrankAligner, OpalAligner, PadAligner, FakeAligner, CustomAligner,
+    HMMERAlignAligner, ProbconsAligner)
     MergerClasses = (MuscleMerger, OpalMerger)
     TreeEstimatorClasses = (FastTree, Randtree, Raxml, FakeTreeEstimator, CustomTreeEstimator)
 else:
