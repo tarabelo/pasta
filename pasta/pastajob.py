@@ -55,6 +55,8 @@ class PastaTeam(object):
         """
         try:
             max_mem_mb = config.sate.max_mem_mb
+            self.num_cpus_spark = config.sate.num_cpus_spark
+            self.num_partitions = config.sate.num_partitions
             self._temp_fs = TempFS()
             self.aligner = config.create_aligner(temp_fs=self._temp_fs)
             self.aligner.max_mem_mb = max_mem_mb
@@ -497,7 +499,10 @@ WARNING: you have specified a max subproblem ({0}) that is equal to or greater
                                 _LOG.debug("Activating Spark")
                                 setSpark(True)
                             from spark_align import spark_align
-                            spark_align(self.pasta_team.alignmentjobs)
+
+                            num_partitions = self.pasta_team.num_partitions
+                            MESSENGER.send_info("[JMAbuin] Number of partitions configured: "+str(num_partitions))
+                            spark_align(self.pasta_team.alignmentjobs, num_partitions)
                             if isSpark():
                                 _LOG.debug("Deactivating Spark")
                                 setSpark(False)
