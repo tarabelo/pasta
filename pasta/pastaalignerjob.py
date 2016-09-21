@@ -231,12 +231,22 @@ class PASTAAlignerJob(TreeHolder, TickableJob):
             self.expected_number_of_taxa, self.max_subproblem_size))
         if self.expected_number_of_taxa <= self.max_subproblem_size:
             _LOG.debug("%s...Calling Aligner" % prefix)
+
+            import multiprocessing
+            available_cpus = multiprocessing.cpu_count()
+
+            num_cpus_spark = available_cpus
+
+            if self.pasta_team.num_cpus_spark != 0:
+                num_cpus_spark = self.pasta_team.num_cpus_spark
+
             aj_list = []
             for index, single_locus_sd in enumerate(self.multilocus_dataset):
                 aj = self.pasta_team.aligner.create_job(single_locus_sd,
                                                         tmp_dir_par=self.tmp_dir_par,
                                                         delete_temps=self.delete_temps,
-                                                        context_str=self.context_str + " align" + str(index))
+                                                        context_str=self.context_str + " align" + str(index),
+                                                        num_cpus_spark=num_cpus_spark)
                 aj.add_parent_tickable_job(self)
                 self.add_child(aj)
 

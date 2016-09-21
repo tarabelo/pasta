@@ -68,7 +68,7 @@ def get_auto_defaults_from_summary_stats(datatype, ntax_nchar_tuple_list, total_
     "pasta" : ["tree_estimator",  "aligner", "merger", "break_strategy",
               "move_to_blind_on_worse_score",  "start_tree_search_from_current",
               "after_blind_iter_without_imp_limit", "max_subproblem_size", 
-              "max_subproblem_frac", "num_cpus", 
+              "max_subproblem_frac", "num_cpus", "num_cpus_spark",
               "time_limit", "after_blind_time_without_imp_limit"],
     "fasttree" : ["model", "GUI_model']
 
@@ -117,6 +117,7 @@ def get_auto_defaults_from_summary_stats(datatype, ntax_nchar_tuple_list, total_
     except:
         pass
     new_pasta_defaults['num_cpus'] = num_cpu
+    #new_pasta_defaults['num_cpus_spark'] = 1
 
     new_defaults['sate'] = new_pasta_defaults
     new_commandline_defaults = {
