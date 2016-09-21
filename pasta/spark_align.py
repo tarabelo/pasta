@@ -34,7 +34,7 @@ def set_input_data(dest, data):
     global input_data
     input_data[dest] = data
 
-def spark_align(joblist):
+def spark_align(joblist, num_partitions):
     _LOG.debug("SPARK alignment starting")
     sc = get_sparkcontext()
     global input_data
@@ -45,8 +45,11 @@ def spark_align(joblist):
         lightjoblist.append((LightJobForProcess(pa[0], pa[1], os.environ), input_data[pa[0][-1]].items()))
 
     # Parallelize the list of pairs (job, data)
-    rdd_joblist = sc.parallelize(lightjoblist)
-
+    #rdd_joblist = sc.parallelize(lightjoblist, len(lightjoblist))
+    if (num_partitions == 0):
+        rdd_joblist = sc.parallelize(lightjoblist, len(lightjoblist))
+    else:
+        rdd_joblist = sc.parallelize(lightjoblist, num_partitions)
     # This two lines are for testing purposes only
     # for j in lightjoblist:
     #   do_align(j)

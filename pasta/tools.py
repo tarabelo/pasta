@@ -253,7 +253,13 @@ class MafftAligner(Aligner):
             invoc.extend(['--ep', '0.123'])
         invoc.extend(['--quiet'])
         invoc.extend(self.user_opts)
-        invoc.extend(['--thread', str(kwargs.get('num_cpus', 1))])
+
+        if get_sparkcontext():
+            import multiprocessing
+            available_cpus = multiprocessing.cpu_count()
+            invoc.extend(['--thread', str(kwargs.get('num_cpus_spark', available_cpus))])
+        else:
+            invoc.extend(['--thread', str(kwargs.get('num_cpus', 1))])
         invoc.append(seqfn)
 
         # The MAFFT job creation is slightly different from the other
