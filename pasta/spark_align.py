@@ -19,10 +19,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Tomas F. Pena and Jose M. Abuin, University of Santiago de Compostela (Spain)
-import os
+import os, stat
 
 from configure_spark import get_sparkcontext, setSpark
-from pasta import get_logger
+from pasta import get_logger, MESSENGER
 from scheduler import LightJobForProcess
 
 _LOG = get_logger(__name__)
@@ -39,11 +39,14 @@ def spark_align(joblist, num_partitions):
     sc = get_sparkcontext()
     global input_data
     lightjoblist = list()
+    # dir_path = os.path.dirname(os.path.realpath(__file__))
+    dir_path = os.getcwd()
     for job in joblist:
         pa = job.start()
-        # Create a list of pairs (job, data)
-        lightjoblist.append((LightJobForProcess(pa[0], pa[1], os.environ), input_data[pa[0][-1]].items()))
 
+        # Create a list of pairs (job, data)
+        #MESSENGER.send_info(pa[0])
+        lightjoblist.append((LightJobForProcess(pa[0], pa[1], os.environ), input_data[pa[0][-1]].items()))
     # Parallelize the list of pairs (job, data)
     #rdd_joblist = sc.parallelize(lightjoblist, len(lightjoblist))
     if (num_partitions == 0):
