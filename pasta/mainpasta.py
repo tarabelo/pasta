@@ -690,6 +690,7 @@ def pasta_main(argv=sys.argv):
 
     MESSENGER.run_log_streams.append(pasta_products.run_log_stream)
     MESSENGER.err_log_streams.append(pasta_products.err_log_stream)
+
     temp_dir, temp_fs = run_pasta_from_config(user_config, pasta_products, multilocus_dataset)
     _TIME_SPENT = time.time() - _START_TIME
     MESSENGER.send_info("Total time spent: %ss" % _TIME_SPENT)
