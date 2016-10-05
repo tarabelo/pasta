@@ -49,6 +49,7 @@ import os
 import sys
 import platform
 import logging
+import time
 
 _LOGGING_LEVEL_ENVAR = "PASTA_LOGGING_LEVEL"
 _LOGGING_FORMAT_ENVAR = "PASTA_LOGGING_FORMAT"
@@ -171,15 +172,15 @@ class Messenger(object):
         self._write_to_streams(self.run_log_streams, msg, flush=flush)
 
     def send_error(self, msg):
-        msg = self._format_msg(msg, "ERROR")
+        msg = self._format_msg("["+time.strftime("%d/%m/%Y %H:%M:%S")+"]" + msg, "ERROR")
         self._write_to_err_streams(msg)
 
     def send_warning(self, msg):
-        msg = self._format_msg(msg, "WARNING")
+        msg = self._format_msg("["+time.strftime("%d/%m/%Y %H:%M:%S")+"]" + msg, "WARNING")
         self._write_to_err_streams(msg)
 
     def send_info(self, msg):
-        msg = self._format_msg(msg, "INFO")
+        msg = self._format_msg("["+time.strftime("%d/%m/%Y %H:%M:%S")+"]" + msg, "INFO")
         self._write_to_out_streams(msg)
 
 ##############################################
@@ -191,7 +192,8 @@ MESSENGER = Messenger()
 
 ##############################################
 ## Other globals
-PASTA_SYSTEM_PATHS_CFGFILE =  os.path.abspath(os.path.join(os.path.expanduser('~'), '.pasta', 'pasta_tool_paths.cfg'))
+#PASTA_SYSTEM_PATHS_CFGFILE = os.path.abspath(os.path.join('/mnt/gluster/drv0/home/usc/ec/jam/', '.pasta', 'pasta_tool_paths.cfg'))
+PASTA_SYSTEM_PATHS_CFGFILE = os.path.abspath(os.path.join(os.path.expanduser('~'), '.pasta', 'pasta_tool_paths.cfg'))
 PASTA_GUI_RESOURCES = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "resources", "images"))
 PASTA_SCRIPT_RESOURCES = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, "resources", "scripts"))
 DEFAULT_MAX_MB = os.environ.get("SATE_MAX_MB", 1024)
