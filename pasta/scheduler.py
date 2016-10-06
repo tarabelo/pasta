@@ -23,6 +23,7 @@
 import errno
 import os
 import traceback
+import stat
 from Queue import Queue
 from cStringIO import StringIO
 from contextlib import contextmanager
@@ -124,11 +125,16 @@ class LightJobForProcess():
 
                 basePath = basePath + "/" + itemPath
 
-                if ((currentItem < finalItemNumber) and (currentItem >= startItemNumber)):
+                if ((currentItem < finalItemNumber) and (currentItem >= startItemNumber) and (os.path.isfile(basePath) or os.path.isdir(basePath))):
                     MESSENGER.send_info("[JMAbuin] Changing permissions of " + basePath)
-                    os.chmod(itemPath, 0777)
+                    try:
+                        os.chmod(basePath, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
+                    except Exception as e:
+                        MESSENGER.send_info("[JMAbuin] ERROR Changing permissions: "+e.message)
 
             currentItem += 1
+
+        MESSENGER.send_info("[JMAbuin] End of changing permissions for "+path)
 
     def run(self):
         _LOG.debug('launching %s.' % " ".join(self._invocation))
@@ -164,12 +170,12 @@ class LightJobForProcess():
 
             MESSENGER.send_info("[JMAbuin] Initial command "+command)
 
-            '''
             if configure_spark.isSpark():
 
                 fileIndex = 0
 
                 if(self._invocation[fileIndex] == "java"): # Case of opal
+                    MESSENGER.send_info("[JMAbuin] We are launching OPAL")
                     fileIndex = 3
 
                     # Example: tempAHc28U/step0/centroid/pw/r5d2_r5d1/tempopal_waXAP/out.fasta
@@ -181,7 +187,7 @@ class LightJobForProcess():
                     #os.chmod(self._invocation[5], 0777)
                     #os.chmod(self._invocation[7], 0777)
                     #os.chmod(self._invocation[9], 0777)
-
+            '''
                 if (os.path.isfile(self._invocation[fileIndex])):
                     MESSENGER.send_info("[JMAbuin] " + self._invocation[fileIndex] + " exists!")
                 else:
@@ -283,27 +289,24 @@ class LightJobForProcess():
 
             output = ""
 
-
             try:
                 if (os.path.isfile(self._invocation[0])):
                     MESSENGER.send_info("[JMAbuin] " + self._invocation[0] + " exists!")
                 else:
-                    MESSENGER.send_info("[JMAbuin] " + self._invocation[0] + " does not exists! Finding it.")
+                    MESSENGER.send_warning("[JMAbuin] " + self._invocation[0] + " does not exists! Finding it.")
 
-                    newMafftPath = self.findMafft("../")
-                    if(os.path.isfile(newMafftPath)):
-                        MESSENGER.send_info("[JMAbuin] new mafft path is "+newMafftPath)
-                        self._invocation[0] = newMafftPath
+                    if (os.path.isfile(os.getcwd() + "/pasta.zip/bin/mafft")):
+                        MESSENGER.send_info("[JMAbuin] Found mafft!! => " + os.getcwd() + "/pasta.zip/bin/mafft")
+                        self._invocation[0] = os.getcwd() + "/pasta.zip/bin/mafft"
+
                     else:
-                        MESSENGER.send_info("[JMAbuin] where the hell is mafft!!!. We are at: "+os.getcwd())
-                        if ( not os.path.isfile(os.getcwd()+"/pasta.zip/bin/mafft")):
-                            MESSENGER.send_info("[JMAbuin] The file "+os.getcwd()+"/pasta.zip/bin/mafft doesnt either exists!!!")
-                            MESSENGER.send_info("[JMAbuin] Changing it to /mnt/gluster/drv0/home/usc/ec/jam/Genomica/sate-tools-linux/mafft")
-                            self._invocation[0] = "/mnt/gluster/drv0/home/usc/ec/jam/Genomica/sate-tools-linux/mafft"
-                        else:
-                            MESSENGER.send_info("[JMAbuin] The file " + os.getcwd() + "/pasta.zip/bin/mafft does exists!!!")
-                            self._invocation[0] = os.getcwd() + "/pasta.zip/bin/mafft"
 
+                        newMafftPath = self.findMafft("../")
+                        if(os.path.isfile(newMafftPath)):
+                            MESSENGER.send_info("[JMAbuin] new found mafft path is "+newMafftPath)
+                            self._invocation[0] = newMafftPath
+                        else:
+                            MESSENGER.send_error("[JMAbuin] Could not find mafft!!")
 
                     MESSENGER.send_info("[JMAbuin] Final mafft" + self._invocation[0])
 
