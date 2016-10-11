@@ -24,6 +24,8 @@ import errno
 import os
 import traceback
 import stat
+import time
+import sys
 from Queue import Queue
 from cStringIO import StringIO
 from contextlib import contextmanager
@@ -114,8 +116,8 @@ class LightJobForProcess():
         startItemNumber = finalItemNumber - itemNumber
         currentItem = 0
 
-        MESSENGER.send_info("[JMAbuin] The start item is " + str(startItemNumber))
-        MESSENGER.send_info("[JMAbuin] The final item is " + str(finalItemNumber))
+        # MESSENGER.send_info("[JMAbuin] The start item is " + str(startItemNumber))
+        # MESSENGER.send_info("[JMAbuin] The final item is " + str(finalItemNumber))
 
         basePath = ""
 
@@ -126,15 +128,15 @@ class LightJobForProcess():
                 basePath = basePath + "/" + itemPath
 
                 if ((currentItem < finalItemNumber) and (currentItem >= startItemNumber) and (os.path.isfile(basePath) or os.path.isdir(basePath))):
-                    MESSENGER.send_info("[JMAbuin] Changing permissions of " + basePath)
+                    # MESSENGER.send_info("[JMAbuin] Changing permissions of " + basePath)
                     try:
                         os.chmod(basePath, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
                     except Exception as e:
-                        MESSENGER.send_info("[JMAbuin] ERROR Changing permissions: "+e.message)
+                        MESSENGER.send_error("[JMAbuin] ERROR Changing permissions: "+e.message)
 
             currentItem += 1
 
-        MESSENGER.send_info("[JMAbuin] End of changing permissions for "+path)
+        # MESSENGER.send_info("[JMAbuin] End of changing permissions for "+path)
 
     def run(self):
         _LOG.debug('launching %s.' % " ".join(self._invocation))
@@ -168,65 +170,86 @@ class LightJobForProcess():
             for item in self._invocation:
                 command = command + " "+item
 
-            MESSENGER.send_info("[JMAbuin] Initial command "+command)
+            # MESSENGER.send_info("[JMAbuin] Initial command "+command)
 
             if configure_spark.isSpark():
 
                 fileIndex = 0
 
                 if(self._invocation[fileIndex] == "java"): # Case of opal
-                    MESSENGER.send_info("[JMAbuin] We are launching OPAL")
+                    # MESSENGER.send_info("[JMAbuin] We are launching OPAL")
                     fileIndex = 3
 
+                    # Check if Java is in our path
+                    # MESSENGER.send_info("[JMAbuin] JAVA_HOME is " + os.getenv('JAVA_HOME'))
+                    # MESSENGER.send_info("[JMAbuin] PATH is " + os.getenv('PATH'))
+
+                    newJava = os.getenv('JAVA_HOME')+"/bin/java"
+
+                    if newJava is not None:
+                        self._invocation[0] = newJava
+
+                    '''
+                    current_dir = os.getcwd()
+                    current_theoretical_dir = ""
+                    currentItem = 0
+                    totalItems = len(self._invocation[5].split("/"))
+
+                    for item in self._invocation[5].split("/"):
+                        if(currentItem > 0) and (totalItems - currentItem > 7):
+                            current_theoretical_dir = current_theoretical_dir + "/" + item
+                        currentItem += 1
+
+                    if(current_dir != current_theoretical_dir):
+                        self._invocation[5] = self._invocation[5].replace(current_theoretical_dir, current_dir)
+                        self._invocation[7] = self._invocation[5].replace(current_theoretical_dir, current_dir)
+                        self._invocation[9] = self._invocation[5].replace(current_theoretical_dir, current_dir)
+                    '''
                     # Example: tempAHc28U/step0/centroid/pw/r5d2_r5d1/tempopal_waXAP/out.fasta
                     # First file:
                     self.changePermissions(self._invocation[5], 7)
                     self.changePermissions(self._invocation[7], 7)
                     self.changePermissions(self._invocation[9], 7)
 
-                    #os.chmod(self._invocation[5], 0777)
-                    #os.chmod(self._invocation[7], 0777)
-                    #os.chmod(self._invocation[9], 0777)
-            '''
-                if (os.path.isfile(self._invocation[fileIndex])):
-                    MESSENGER.send_info("[JMAbuin] " + self._invocation[fileIndex] + " exists!")
-                else:
-                    MESSENGER.send_info("[JMAbuin] " + self._invocation[fileIndex] + " does not exists! Finding it.")
+                execname = os.path.basename(self._invocation[fileIndex])
 
-                    execname = os.path.basename(self._invocation[fileIndex])
-                    newInvocationPath = self.findFile("../", execname)
+                if (not os.path.isfile(self._invocation[fileIndex])):
+                    MESSENGER.send_warning("[JMAbuin] " + self._invocation[fileIndex] + " does not exists! Finding it.")
 
-                    if (os.path.isfile(newInvocationPath)):
-                        MESSENGER.send_info("[JMAbuin] new "+execname+" path is " + newInvocationPath)
-                        self._invocation[fileIndex] = newInvocationPath
+                    if(os.path.isfile(os.getcwd() + "/pasta.zip/bin/" + execname)):
+                        MESSENGER.send_info("[JMAbuin] Found " + execname + "!! => " + os.getcwd() + "/pasta.zip/bin/" + execname)
+                        self._invocation[fileIndex] = os.getcwd() + "/pasta.zip/bin/" + execname
+
                     else:
-                        MESSENGER.send_info("[JMAbuin] where the hell is "+execname+"!!!. We are at: " + os.getcwd())
-                        if (not os.path.isfile(os.getcwd() + "/pasta.zip/bin/" + execname)):
-                            MESSENGER.send_info(
-                                "[JMAbuin] The file " + os.getcwd() + "/pasta.zip/bin/"+execname+" doesnt either exists!!!")
-                            MESSENGER.send_info(
-                                "[JMAbuin] Changing it to /mnt/gluster/drv0/home/usc/ec/jam/Genomica/sate-tools-linux/"+execname)
-                            self._invocation[fileIndex] = "/mnt/gluster/drv0/home/usc/ec/jam/Genomica/sate-tools-linux/"+execname
-                        else:
-                            MESSENGER.send_info("[JMAbuin] The file " + os.getcwd() + "/pasta.zip/bin/"+execname+" does exists!!!")
-                            self._invocation[fileIndex] = os.getcwd() + "/pasta.zip/bin/"+execname
 
-                    MESSENGER.send_info("[JMAbuin] Final "+execname+" => " + self._invocation[fileIndex])
+                        newInvocationPath = self.findFile("../", execname)
+
+                        if (os.path.isfile(newInvocationPath)):
+                            MESSENGER.send_info("[JMAbuin] new " + execname + " path is " + newInvocationPath)
+                            self._invocation[fileIndex] = newInvocationPath
+                        else:
+                            MESSENGER.send_error("[JMAbuin] Could not find " + execname + "!!")
+
+                # MESSENGER.send_info("[JMAbuin] Final " + execname + " => " + self._invocation[fileIndex])
 
                 command = ""
                 for item in self._invocation:
                     command = command + " " + item
 
-                MESSENGER.send_info("[JMAbuin] Final command " + command)
-            '''
+                # MESSENGER.send_info("[JMAbuin] Final command " + command)
+
+            startTime = time.time()
+
             process = Popen(self._invocation, stdin=PIPE, **k)
             self.return_code = process.wait() # Chema aqui
+
+            endTime = time.time()
 
             # process = Popen(self._invocation, stdin=PIPE, **k)
             # (output, output_err) = process.communicate()
             # self.return_code = process.returncode
 
-            MESSENGER.send_info("[JMAbuin] return code is: "+str(self.return_code))
+            MESSENGER.send_info("[JMAbuin] return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
 
             _stdout_fo.close()
             _stderr_fo.close()
@@ -246,14 +269,16 @@ class LightJobForProcess():
             self.error = "\n".join(err_msg)
 
             MESSENGER.send_error("[JMAbuin] " + ose.message)
-            # MESSENGER.send_error("[JMAbuin] " + ose.child_traceback)
+            MESSENGER.send_error("[JMAbuin] " + ose.child_traceback)
             _LOG.error(self.error)
+            sys.exit(ose.message + " :: "+ose.child_traceback)
 
         except Exception as e:
             err_msg.append(str(e.message))
             self.error = "\n".join(err_msg)
             MESSENGER.send_error("[JMAbuin] " + self.error)
             _LOG.error(self.error)
+            sys.exit(e.message)
 
     def findMafft(self, path):
         for root, dirs, files in os.walk(path):
@@ -310,10 +335,17 @@ class LightJobForProcess():
 
                     MESSENGER.send_info("[JMAbuin] Final mafft" + self._invocation[0])
 
+                startTime = time.time()
                 process = Popen(self._invocation, stdin=PIPE, **k)
 
                 (output, output_err) = process.communicate()
+
+                endTime = time.time()
+
                 self.return_code = process.returncode
+
+                MESSENGER.send_info("[JMAbuin] return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
+
                 process.stdin.close()
                 process.stdout.close()
                 process.stderr.close()
@@ -331,12 +363,14 @@ class LightJobForProcess():
                 err_msg.append(str(ose))
                 MESSENGER.send_error("[JMAbuin] " + ose.message)
                 MESSENGER.send_error("[JMAbuin] " + ose.child_traceback)
+                sys.exit(ose.message+" :: "+ose.child_traceback)
 
             except Exception as e:
                 err_msg.append(str(e))
                 MESSENGER.send_error("[JMAbuin] " + str(e))
                 self.error = "\n".join(err_msg)
                 _LOG.error(self.error)
+                sys.exit(e.message)
             return output
 
 
