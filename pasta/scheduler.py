@@ -23,6 +23,9 @@
 import errno
 import os
 import traceback
+import stat
+import time
+import sys
 from Queue import Queue
 from cStringIO import StringIO
 from contextlib import contextmanager
@@ -33,7 +36,7 @@ from subprocess import Popen, PIPE
 from tempfile import mkdtemp
 from threading import Thread, Event, Lock
 
-from pasta import get_logger, TIMING_LOG
+from pasta import get_logger, TIMING_LOG, MESSENGER, configure_spark
 from pasta.filemgr import open_with_intermediates
 
 _LOG = get_logger(__name__)
@@ -98,7 +101,43 @@ class LightJobForProcess():
             return errorFromFile
         else:
             return None
-                
+
+    def findFile(self, path, fileName):
+        for root, dirs, files in os.walk(path):
+            if fileName in files:
+                return os.path.join(root, fileName)
+
+        return ""
+
+    def changePermissions(self, path, itemNumber):
+        # Example: tempAHc28U/step0/centroid/pw/r5d2_r5d1/tempopal_waXAP/out.fasta
+        # First file:
+        finalItemNumber = len(path.split("/"))
+        startItemNumber = finalItemNumber - itemNumber
+        currentItem = 0
+
+        # MESSENGER.send_info("[JMAbuin] The start item is " + str(startItemNumber))
+        # MESSENGER.send_info("[JMAbuin] The final item is " + str(finalItemNumber))
+
+        basePath = ""
+
+        for itemPath in path.split("/"):
+
+            if (itemPath):
+
+                basePath = basePath + "/" + itemPath
+
+                if ((currentItem < finalItemNumber) and (currentItem >= startItemNumber) and (os.path.isfile(basePath) or os.path.isdir(basePath))):
+                    # MESSENGER.send_info("[JMAbuin] Changing permissions of " + basePath)
+                    try:
+                        os.chmod(basePath, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)
+                    except Exception as e:
+                        MESSENGER.send_error("[JMAbuin] ERROR Changing permissions: "+e.message)
+
+            currentItem += 1
+
+        # MESSENGER.send_info("[JMAbuin] End of changing permissions for "+path)
+
     def run(self):
         _LOG.debug('launching %s.' % " ".join(self._invocation))
         k = self._k
@@ -119,27 +158,134 @@ class LightJobForProcess():
         for key, v in self.environ.items():
             os.environ[key] = v
 
-        process = Popen(self._invocation, stdin = PIPE, **k)
-
-        err_msg = []                
+        err_msg = []
         err_msg.append("PASTA failed because one of the programs it tried to run failed.")
         err_msg.append('The invocation that failed was: \n    "%s"\n' % '" "'.join(self._invocation))
+
+        self.return_code = 0  # Initialization of return code
+
         try:
-            self.return_code = process.wait()
+
+            command = ""
+            for item in self._invocation:
+                command = command + " "+item
+
+            # MESSENGER.send_info("[JMAbuin] Initial command "+command)
+
+            if configure_spark.isSpark():
+
+                fileIndex = 0
+
+                if(self._invocation[fileIndex] == "java"): # Case of opal
+                    # MESSENGER.send_info("[JMAbuin] We are launching OPAL")
+                    fileIndex = 3
+
+                    # Check if Java is in our path
+                    # MESSENGER.send_info("[JMAbuin] JAVA_HOME is " + os.getenv('JAVA_HOME'))
+                    # MESSENGER.send_info("[JMAbuin] PATH is " + os.getenv('PATH'))
+
+                    newJava = os.getenv('JAVA_HOME')+"/bin/java"
+
+                    if newJava is not None:
+                        self._invocation[0] = newJava
+
+                    '''
+                    current_dir = os.getcwd()
+                    current_theoretical_dir = ""
+                    currentItem = 0
+                    totalItems = len(self._invocation[5].split("/"))
+
+                    for item in self._invocation[5].split("/"):
+                        if(currentItem > 0) and (totalItems - currentItem > 7):
+                            current_theoretical_dir = current_theoretical_dir + "/" + item
+                        currentItem += 1
+
+                    if(current_dir != current_theoretical_dir):
+                        self._invocation[5] = self._invocation[5].replace(current_theoretical_dir, current_dir)
+                        self._invocation[7] = self._invocation[5].replace(current_theoretical_dir, current_dir)
+                        self._invocation[9] = self._invocation[5].replace(current_theoretical_dir, current_dir)
+                    '''
+                    # Example: tempAHc28U/step0/centroid/pw/r5d2_r5d1/tempopal_waXAP/out.fasta
+                    # First file:
+                    self.changePermissions(self._invocation[5], 7)
+                    self.changePermissions(self._invocation[7], 7)
+                    self.changePermissions(self._invocation[9], 7)
+
+                execname = os.path.basename(self._invocation[fileIndex])
+
+                if (not os.path.isfile(self._invocation[fileIndex])):
+                    MESSENGER.send_warning("[JMAbuin] " + self._invocation[fileIndex] + " does not exists! Finding it.")
+
+                    if(os.path.isfile(os.getcwd() + "/pasta.zip/bin/" + execname)):
+                        MESSENGER.send_info("[JMAbuin] Found " + execname + "!! => " + os.getcwd() + "/pasta.zip/bin/" + execname)
+                        self._invocation[fileIndex] = os.getcwd() + "/pasta.zip/bin/" + execname
+
+                    else:
+
+                        newInvocationPath = self.findFile("../", execname)
+
+                        if (os.path.isfile(newInvocationPath)):
+                            MESSENGER.send_info("[JMAbuin] new " + execname + " path is " + newInvocationPath)
+                            self._invocation[fileIndex] = newInvocationPath
+                        else:
+                            MESSENGER.send_error("[JMAbuin] Could not find " + execname + "!!")
+
+                # MESSENGER.send_info("[JMAbuin] Final " + execname + " => " + self._invocation[fileIndex])
+
+                command = ""
+                for item in self._invocation:
+                    command = command + " " + item
+
+                # MESSENGER.send_info("[JMAbuin] Final command " + command)
+
+            startTime = time.time()
+
+            process = Popen(self._invocation, stdin=PIPE, **k)
+            self.return_code = process.wait() # Chema aqui
+
+            endTime = time.time()
+
+            # process = Popen(self._invocation, stdin=PIPE, **k)
+            # (output, output_err) = process.communicate()
+            # self.return_code = process.returncode
+
+            MESSENGER.send_info("[JMAbuin] return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
+
             _stdout_fo.close()
             _stderr_fo.close()
             process.stdin.close()
-            if self.return_code:
+
+            if self.return_code < 0:
                 errorFromFile = self.read_stderr(_stderr_fo)
                 if errorFromFile:
                     err_msg.append(errorFromFile)
+                    # err_msg.append(output_err)
                 self.error = "\n".join(err_msg)
                 raise Exception("")
-            _LOG.debug('Finished %s.\n Return code: %s; %s' % (" ".join(self._invocation), self.return_code, self.error))        
-        except Exception as e:
-            err_msg.append(str(e))
+            _LOG.debug('Finished %s.\n Return code: %s; %s' % (" ".join(self._invocation), self.return_code, self.error))
+
+        except OSError as ose:
+            err_msg.append(str(ose))
             self.error = "\n".join(err_msg)
+
+            MESSENGER.send_error("[JMAbuin] " + ose.message)
+            MESSENGER.send_error("[JMAbuin] " + ose.child_traceback)
             _LOG.error(self.error)
+            sys.exit(ose.message + " :: "+ose.child_traceback)
+
+        except Exception as e:
+            err_msg.append(str(e.message))
+            self.error = "\n".join(err_msg)
+            MESSENGER.send_error("[JMAbuin] " + self.error)
+            _LOG.error(self.error)
+            sys.exit(e.message)
+
+    def findMafft(self, path):
+        for root, dirs, files in os.walk(path):
+            if "mafft" in files:
+                return os.path.join(root, "mafft")
+
+        return ""
 
     def runwithpipes(self):
         k = self._k
@@ -154,14 +300,52 @@ class LightJobForProcess():
 
             _LOG.debug('Launching %s.' % " ".join(self._invocation))
             _LOG.debug('Options %s.', k)
-            process = Popen(self._invocation, stdin=PIPE, **k)
+
+            command = ""
+            for item in self._invocation:
+               command = command + " "+item
+            MESSENGER.send_info("[JMAbuin] Initial mafft command "+command)
+
+            # process = Popen(command, stdin=PIPE, shell=True, **k)
 
             err_msg = []
             err_msg.append("PASTA failed because one of the programs it tried to run failed.")
             err_msg.append('The invocation that failed was: \n    "%s"\n' % '" "'.join(self._invocation))
+
+            output = ""
+
             try:
+                if (os.path.isfile(self._invocation[0])):
+                    MESSENGER.send_info("[JMAbuin] " + self._invocation[0] + " exists!")
+                else:
+                    MESSENGER.send_warning("[JMAbuin] " + self._invocation[0] + " does not exists! Finding it.")
+
+                    if (os.path.isfile(os.getcwd() + "/pasta.zip/bin/mafft")):
+                        MESSENGER.send_info("[JMAbuin] Found mafft!! => " + os.getcwd() + "/pasta.zip/bin/mafft")
+                        self._invocation[0] = os.getcwd() + "/pasta.zip/bin/mafft"
+
+                    else:
+
+                        newMafftPath = self.findMafft("../")
+                        if(os.path.isfile(newMafftPath)):
+                            MESSENGER.send_info("[JMAbuin] new found mafft path is "+newMafftPath)
+                            self._invocation[0] = newMafftPath
+                        else:
+                            MESSENGER.send_error("[JMAbuin] Could not find mafft!!")
+
+                    MESSENGER.send_info("[JMAbuin] Final mafft" + self._invocation[0])
+
+                startTime = time.time()
+                process = Popen(self._invocation, stdin=PIPE, **k)
+
                 (output, output_err) = process.communicate()
+
+                endTime = time.time()
+
                 self.return_code = process.returncode
+
+                MESSENGER.send_info("[JMAbuin] return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
+
                 process.stdin.close()
                 process.stdout.close()
                 process.stderr.close()
@@ -174,11 +358,21 @@ class LightJobForProcess():
                     raise Exception("")
                 _LOG.debug(
                     'Finished %s.\n Return code: %s; %s' % (" ".join(self._invocation), self.return_code, self.error))
+
+            except OSError as ose:
+                err_msg.append(str(ose))
+                MESSENGER.send_error("[JMAbuin] " + ose.message)
+                MESSENGER.send_error("[JMAbuin] " + ose.child_traceback)
+                sys.exit(ose.message+" :: "+ose.child_traceback)
+
             except Exception as e:
                 err_msg.append(str(e))
+                MESSENGER.send_error("[JMAbuin] " + str(e))
                 self.error = "\n".join(err_msg)
                 _LOG.error(self.error)
+                sys.exit(e.message)
             return output
+
 
 class pworker():
     def __init__(self, q, err_shared_obj):
