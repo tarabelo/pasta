@@ -469,9 +469,32 @@ def finish_pasta_execution(pasta_team,
         if alignment_as_tmp_filename_to_report is not None:
             MESSENGER.send_info(
                 'The resulting alignment (with the names in a "safe" form) was first written as the file "%s"' % alignment_as_tmp_filename_to_report)
+
+            # If we are running a Spark job, we store the result in HDFS
+            if isSpark:
+                sc = get_sparkcontext()
+                fileRDD = sc.textFile("file://" + alignment_as_tmp_filename_to_report)
+
+                partsFile = alignment_as_tmp_filename_to_report.split("/")
+                fileRDD.saveAsTextFile(partsFile[len(partsFile) - 1])
+
+                MESSENGER.send_info(
+                    'As we are using Spark for alignment, resulting alignment file is stored in HDFS at "%s"' % partsFile[len(partsFile) - 1])
+
         if tree_as_tmp_filename_to_report is not None:
             MESSENGER.send_info(
                 'The resulting tree (with the names in a "safe" form) was first written as the file "%s"' % tree_as_tmp_filename_to_report)
+
+            # If we are running a Spark job, we store the result in HDFS
+            if isSpark:
+                sc = get_sparkcontext()
+                fileRDD = sc.textFile("file://" + tree_as_tmp_filename_to_report)
+
+                partsFile = tree_as_tmp_filename_to_report.split("/")
+                fileRDD.saveAsTextFile(partsFile[len(partsFile) - 1]);
+
+                MESSENGER.send_info(
+                    'As we are using Spark for alignment, resulting tree file is stored in HDFS at "%s"' % partsFile[len(partsFile) - 1])
 
     finally:
         stop_worker()
