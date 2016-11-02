@@ -49,6 +49,9 @@ def spark_align(joblist, num_partitions):
         lightjoblist.append((LightJobForProcess(pa[0], pa[1], os.environ), input_data[pa[0][-1]].items()))
     # Parallelize the list of pairs (job, data)
     #rdd_joblist = sc.parallelize(lightjoblist, len(lightjoblist))
+
+    MESSENGER.send_info("[JMAbuin] The number of light jobs is: "+str(len(lightjoblist)))
+
     if (num_partitions == 0):
         rdd_joblist = sc.parallelize(lightjoblist, len(lightjoblist))
     else:
