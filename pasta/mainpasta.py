@@ -285,11 +285,13 @@ def finish_pasta_execution(pasta_team,
                     qn = len(query_seq)
                     chunks = min(int(4 * pasta_config.num_cpus), int(ceil(qn / 50.0)))
                     _LOG.debug("Will align the remaining %d sequences in %d chunks" % (qn, chunks))
+                    MESSENGER.send_info("Will align the remaining %d sequences in %d chunks" % (qn, chunks))
                     for ch in xrange(0, chunks):
                         query_fn = os.path.join(init_aln_dir, "query-%d.fasta" % ch)
                         qa = unaligned_seqs.sub_alignment(query_seq[ch:qn:chunks])
                         _LOG.debug("Chunk with %d sequences built" % len(qa))
-                        qa.write_filepath(query_fn)
+                        MESSENGER.send_info("Chunk %s with %d sequences built" % (os.path.join(init_aln_dir, "query-%d.fasta" % ch), len(qa)))
+                        qa.write_filepath(query_fn, building_tree=True)
                         query_fns.append(query_fn)
 
                     job = pasta_team.aligner.create_job(backbone_seqs,
@@ -299,8 +301,34 @@ def finish_pasta_execution(pasta_team,
                                                         num_cpus=pasta_config.num_cpus)
                     aln_job_list.append(job)
                 _RunningJobs = aln_job_list
-                for job in aln_job_list:
-                    jobq.put(job)
+
+                # After Chema:: New version. Start alignment jobs
+                MESSENGER.send_info("Start alignment jobs.")
+                if get_sparkcontext():
+                    if not isSpark():
+                        _LOG.debug("Activating Spark")
+                        setSpark(True)
+                    from spark_align import spark_align
+
+                    MESSENGER.send_info("[JMAbuin] Number of partitions configured: ")
+                    spark_align(aln_job_list, 1)
+
+                    for job in aln_job_list:
+                        print job
+
+                    if isSpark():
+                        _LOG.debug("Deactivating Spark")
+                        setSpark(False)
+                else:
+                    MESSENGER.send_info("[JMAbuin] Number of partitions configured: NONE")
+                    print jobq
+                    for job in aln_job_list:
+                        jobq.put(job)
+
+                #Before
+                #MESSENGER.send_info("[JMAbuin] Running MAFFT in Driver for initial tree")
+                #for job in aln_job_list:
+                #    jobq.put(job)
 
                 new_alignment = compact(job.get_results())
 
