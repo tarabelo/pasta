@@ -249,7 +249,7 @@ class LightJobForProcess():
             # (output, output_err) = process.communicate()
             # self.return_code = process.returncode
 
-            MESSENGER.send_info("[JMAbuin] return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
+            MESSENGER.send_info("[JMAbuin] :: run :: return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
 
             _stdout_fo.close()
             _stderr_fo.close()
@@ -344,7 +344,7 @@ class LightJobForProcess():
 
                 self.return_code = process.returncode
 
-                MESSENGER.send_info("[JMAbuin] return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
+                MESSENGER.send_info("[JMAbuin] :: runwithpipes :: return code from " + self._invocation[0] + " is: " + str(self.return_code) + " and execution time is: " + str(endTime - startTime) + " seconds.")
 
                 process.stdin.close()
                 process.stdout.close()
