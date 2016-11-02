@@ -28,7 +28,7 @@ import sys
 import time
 
 from alignment import Alignment
-from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG
+from pasta import TEMP_SEQ_ALIGNMENT_TAG, TEMP_TREE_TAG, MESSENGER
 from pasta import get_logger, GLOBAL_DEBUG, PASTA_SYSTEM_PATHS_CFGFILE, DEFAULT_MAX_MB,\
     TEMP_SEQ_UNMASKED_ALIGNMENT_TAG
 from pasta.configure_spark import get_sparkcontext, setSpark, isSpark
@@ -255,11 +255,16 @@ class MafftAligner(Aligner):
         invoc.extend(self.user_opts)
 
         if get_sparkcontext():
+            #import multiprocessing
+            #available_cpus = multiprocessing.cpu_count()
+            MESSENGER.send_info("Using spark to launch MAFFT")
+            invoc.extend(['--thread', str(kwargs.get('num_cpus_spark', 1))])
+            #invoc.extend(['--thread', str(kwargs.get('num_cpus_spark', available_cpus))])
+        else:
             import multiprocessing
             available_cpus = multiprocessing.cpu_count()
-            invoc.extend(['--thread', str(kwargs.get('num_cpus_spark', available_cpus))])
-        else:
-            invoc.extend(['--thread', str(kwargs.get('num_cpus', 1))])
+            MESSENGER.send_info("NOT using spark to launch MAFFT")
+            invoc.extend(['--thread', str(kwargs.get('num_cpus', available_cpus))])
         invoc.append(seqfn)
 
         # The MAFFT job creation is slightly different from the other
