@@ -411,10 +411,10 @@ class Alignment(dict, object):
         for name, seq in read_func(file_obj):
             self[name] = seq
 
-    def write_filepath(self, filename, file_format='FASTA', zipout=False):
+    def write_filepath(self, filename, file_format='FASTA', zipout=False, building_tree=False):
         """Writes the sequence data in the specified `file_format` to `filename`"""
         from configure_spark import isSpark
-        if not isSpark():
+        if not isSpark() or building_tree:
             file_obj = open_with_intermediates(filename, 'w')
             if zipout:
                 import gzip
