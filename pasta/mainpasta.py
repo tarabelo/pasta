@@ -313,15 +313,12 @@ def finish_pasta_execution(pasta_team,
                     MESSENGER.send_info("[JMAbuin] Number of partitions configured: ")
                     spark_align(aln_job_list, 1)
 
-                    for job in aln_job_list:
-                        print job
-
                     if isSpark():
                         _LOG.debug("Deactivating Spark")
                         setSpark(False)
                 else:
                     MESSENGER.send_info("[JMAbuin] Number of partitions configured: NONE")
-                    print jobq
+
                     for job in aln_job_list:
                         jobq.put(job)
 
@@ -332,6 +329,8 @@ def finish_pasta_execution(pasta_team,
 
                 new_alignment = compact(job.get_results())
 
+                MESSENGER.send_info("[JMAbuin] Alignment finished. Starting Hmmeralign")
+
                 add_job_list = []
                 for query_fn in query_fns:
                     job = pasta_team.hmmeralign.create_job(new_alignment, query_fn,
@@ -339,7 +338,10 @@ def finish_pasta_execution(pasta_team,
                                                            context_str="initalign",
                                                            delete_temps=delete_aln_temps)
                     add_job_list.append(job)
+
                 _RunningJobs = None
+                #_RunningJobs = add_job_list
+
                 for job in add_job_list:
                     jobq.put(job)
                 for job in add_job_list:
@@ -347,6 +349,9 @@ def finish_pasta_execution(pasta_team,
                     # new_alignment_list.apend(new_alignment)
                 # for locus_index, new_alignment in enumerate(new_alignment_list):
                 multilocus_dataset[0] = new_alignment
+
+                MESSENGER.send_info("[JMAbuin] Finished Hmmeralign")
+                #_RunningJobs = None
 
                 if delete_aln_temps:
                     pasta_team.temp_fs.remove_dir(init_aln_dir)
@@ -494,35 +499,54 @@ def finish_pasta_execution(pasta_team,
         MESSENGER.send_info("Writing resulting likelihood score to %s" % pasta_products.score_stream.name)
         pasta_products.score_stream.write("%s\n" % job.score)
 
-        if alignment_as_tmp_filename_to_report is not None:
+        if alignment_as_tmp_filename_to_report is not None and os.path.isfile(alignment_as_tmp_filename_to_report):
             MESSENGER.send_info(
                 'The resulting alignment (with the names in a "safe" form) was first written as the file "%s"' % alignment_as_tmp_filename_to_report)
 
             # If we are running a Spark job, we store the result in HDFS
             if isSpark:
                 sc = get_sparkcontext()
-                fileRDD = sc.textFile("file://" + alignment_as_tmp_filename_to_report)
 
-                partsFile = alignment_as_tmp_filename_to_report.split("/")
-                fileRDD.saveAsTextFile(partsFile[len(partsFile) - 1])
+                finalFile = open(alignment_as_tmp_filename_to_report, 'r')
+                finalData = ""
+
+                for line in finalFile:
+                    finalData = finalData + line
+
+                finalFile.close()
+
+                dataToWrite = []
+                dataToWrite.append(finalData)
+
+                fileRDD = sc.parallelize(dataToWrite)
+                fileRDD.saveAsTextFile(os.path.basename(alignment_as_tmp_filename_to_report))
 
                 MESSENGER.send_info(
-                    'As we are using Spark for alignment, resulting alignment file is stored in HDFS at "%s"' % partsFile[len(partsFile) - 1])
+                    'As we are using Spark for alignment, resulting alignment file is stored in HDFS at "%s"' % os.path.basename(alignment_as_tmp_filename_to_report))
 
-        if tree_as_tmp_filename_to_report is not None:
+        if tree_as_tmp_filename_to_report is not None and os.path.isfile(tree_as_tmp_filename_to_report):
             MESSENGER.send_info(
                 'The resulting tree (with the names in a "safe" form) was first written as the file "%s"' % tree_as_tmp_filename_to_report)
 
             # If we are running a Spark job, we store the result in HDFS
             if isSpark:
                 sc = get_sparkcontext()
-                fileRDD = sc.textFile("file://" + tree_as_tmp_filename_to_report)
+                finalFile = open(tree_as_tmp_filename_to_report, 'r')
+                finalData = ""
 
-                partsFile = tree_as_tmp_filename_to_report.split("/")
-                fileRDD.saveAsTextFile(partsFile[len(partsFile) - 1]);
+                for line in finalFile:
+                    finalData = finalData + line
+
+                finalFile.close()
+
+                dataToWrite = []
+                dataToWrite.append(finalData)
+
+                fileRDD = sc.parallelize(dataToWrite)
+                fileRDD.saveAsTextFile(os.path.basename(tree_as_tmp_filename_to_report))
 
                 MESSENGER.send_info(
-                    'As we are using Spark for alignment, resulting tree file is stored in HDFS at "%s"' % partsFile[len(partsFile) - 1])
+                    'As we are using Spark for alignment, resulting tree file is stored in HDFS at "%s"' % os.path.basename(tree_as_tmp_filename_to_report))
 
     finally:
         stop_worker()
