@@ -379,6 +379,8 @@ def finish_pasta_execution(pasta_team,
                                                                                               allow_existing=True)
             tree_as_tmp_filename_to_report = pasta_products.get_abs_path_for_iter_output("initialsearch", TEMP_TREE_TAG,
                                                                                          allow_existing=True)
+            MESSENGER.send_info("The initial tree is: " + tree_as_tmp_filename_to_report)
+
             if delete_tree_temps:
                 pasta_team.temp_fs.remove_dir(init_tree_dir)
         _LOG.debug('We have the tree and whole_alignment, partitions...')
@@ -504,7 +506,12 @@ def finish_pasta_execution(pasta_team,
                 'The resulting alignment (with the names in a "safe" form) was first written as the file "%s"' % alignment_as_tmp_filename_to_report)
 
             # If we are running a Spark job, we store the result in HDFS
-            if isSpark:
+            if get_sparkcontext():
+
+                if not isSpark():
+                    _LOG.debug("Activating Spark")
+                    setSpark(True)
+
                 sc = get_sparkcontext()
 
                 finalFile = open(alignment_as_tmp_filename_to_report, 'r')
@@ -524,12 +531,21 @@ def finish_pasta_execution(pasta_team,
                 MESSENGER.send_info(
                     'As we are using Spark for alignment, resulting alignment file is stored in HDFS at "%s"' % os.path.basename(alignment_as_tmp_filename_to_report))
 
+                if isSpark():
+                    _LOG.debug("Deactivating Spark")
+                    setSpark(False)
+
         if tree_as_tmp_filename_to_report is not None and os.path.isfile(tree_as_tmp_filename_to_report):
             MESSENGER.send_info(
                 'The resulting tree (with the names in a "safe" form) was first written as the file "%s"' % tree_as_tmp_filename_to_report)
 
             # If we are running a Spark job, we store the result in HDFS
-            if isSpark:
+            if get_sparkcontext():
+
+                if not isSpark():
+                    _LOG.debug("Activating Spark")
+                    setSpark(True)
+
                 sc = get_sparkcontext()
                 finalFile = open(tree_as_tmp_filename_to_report, 'r')
                 finalData = ""
@@ -547,6 +563,10 @@ def finish_pasta_execution(pasta_team,
 
                 MESSENGER.send_info(
                     'As we are using Spark for alignment, resulting tree file is stored in HDFS at "%s"' % os.path.basename(tree_as_tmp_filename_to_report))
+
+                if isSpark():
+                    _LOG.debug("Deactivating Spark")
+                    setSpark(False)
 
     finally:
         stop_worker()
